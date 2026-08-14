@@ -41,10 +41,11 @@ swift test
 
 ### iOS / iMessage app (macOS)
 
-The Xcode project is generated from `ios/project.yml` using [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+The Xcode project is generated from `ios/project.yml` using [XcodeGen](https://github.com/yonaskolb/XcodeGen). Pingo keeps one square master icon in git; the Apple-required Messages extension icon variants are generated locally from that master before project generation.
 
 ```bash
 brew install xcodegen
+bash ios/scripts/generate-imessage-icons.sh
 xcodegen generate --spec ios/project.yml
 open ios/Pingo.xcodeproj
 ```
