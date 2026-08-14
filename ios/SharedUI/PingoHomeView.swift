@@ -2,6 +2,7 @@ import PingoCore
 import SwiftUI
 
 struct PingoHomeView: View {
+    let onChallenge: (PingoGameID) -> Void
     @State private var selectedGame: PingoGameDescriptor?
 
     private let columns = [
@@ -29,7 +30,10 @@ struct PingoHomeView: View {
         }
         .background(Color.pingoSurface.ignoresSafeArea())
         .sheet(item: $selectedGame) { game in
-            GameComingSoonView(game: game)
+            ChallengeGameView(game: game) {
+                onChallenge(game.id)
+                selectedGame = nil
+            }
         }
     }
 
@@ -48,7 +52,7 @@ struct PingoHomeView: View {
     }
 
     private var footer: some View {
-        Text("Wave 1 foundation • 10 launch games")
+        Text("10 launch games • Pingo profiles • iMessage challenges")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -81,8 +85,9 @@ private struct GameTile: View {
     }
 }
 
-private struct GameComingSoonView: View {
+private struct ChallengeGameView: View {
     let game: PingoGameDescriptor
+    let onChallenge: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -91,13 +96,18 @@ private struct GameComingSoonView: View {
                 .font(.system(size: 64))
             Text(game.name)
                 .font(.title.bold())
-            Text("The game slot is wired into Pingo. Gameplay arrives in its dedicated build wave.")
+            Text("Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept and continue the match.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
-            Button("Done") { dismiss() }
-                .buttonStyle(.borderedProminent)
-                .tint(.pingoPrimary)
+            Button("Send Challenge") {
+                onChallenge()
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.pingoPrimary)
+            Button("Cancel") { dismiss() }
+                .buttonStyle(.bordered)
         }
         .padding(28)
         .presentationDetents([.medium])
