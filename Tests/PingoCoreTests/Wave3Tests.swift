@@ -199,7 +199,7 @@ final class Wave3Tests: XCTestCase {
         let shots0 = (0..<90).map { PingoSeaBattleShot(cell: $0, hit: $0 % 3 == 0) }
         let shots1 = (10..<100).map { PingoSeaBattleShot(cell: $0, hit: $0 % 4 == 0) }
         let state = PingoSeaBattleState(fleetReady: [true, true], shots: [shots0, shots1])
-        let gameState = try JSONEncoder().encode(state)
+        let gameState = try PingoBoardGameEngine.seaBattleStateData(state)
         let sender = PingoPublicProfile(username: "payloadtester")
         let opponent = UUID()
         let match = PingoMatchEnvelope(
