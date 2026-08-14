@@ -1,6 +1,7 @@
 import Foundation
 import PingoCore
 
+@MainActor
 final class PingoSeaBattlePrivateStore {
     static let shared = PingoSeaBattlePrivateStore()
 
