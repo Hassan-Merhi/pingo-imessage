@@ -14,9 +14,11 @@ Wave 3 adds the first five complete game engines and playable iMessage interface
 - Connect Four — gravity, horizontal/vertical/diagonal wins and draws
 - Checkers — forced captures, multi-jumps, kings and win detection
 - Chess — legal-move filtering, check/checkmate, stalemate, castling, en passant, promotion, 50-move and insufficient-material draws
-- Sea Battle — manual fleet placement/orientation, overlap validation, hidden opponent fleet, hit/miss/sunk tracking and victory detection
+- Sea Battle — manual fleet placement/orientation, private fleet storage, public hit/miss/sunk tracking and victory detection
 
-All five games use the Wave 2 match envelope and revision guard. A player makes a move inside Messages, Pingo prepares the updated interactive message in the compose field, and the player sends that card back to the opponent. Sea Battle fleet placement is staged locally and committed as one outgoing setup turn instead of five separate messages.
+All five games use the Wave 2 match envelope and revision guard. A player makes a move inside Messages, Pingo prepares the updated interactive message in the compose field, and the player sends that card back to the opponent.
+
+Sea Battle is deliberately different because its ship positions are secret. A player's five-ship fleet is validated and stored only in that player's Messages-extension sandbox. Fleet coordinates never enter the shared iMessage payload; shared state contains only readiness, pending shots and public hit/miss/sunk results. When a player receives an opponent shot, Pingo resolves it against the device-private fleet and can batch that resolution with the player's return shot into one outgoing card. A Sea Battle match therefore needs to continue on the device that holds that player's private fleet.
 
 The remaining five launch games — 8-Ball, Cup Pong, Basketball, Darts and Mini Golf — stay visible in the launch catalog as upcoming until their physics wave is complete.
 
