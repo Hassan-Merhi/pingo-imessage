@@ -20,7 +20,7 @@ public struct PingoPlayerRef: Hashable, Codable, Sendable {
 }
 
 public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let id: UUID
     public let schemaVersion: Int
@@ -28,8 +28,12 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
     public let status: PingoMatchStatus
     public let createdAt: Date
     public let updatedAt: Date
+    public let expiresAt: Date?
+    public let revision: Int
     public let turnNumber: Int
+    public let createdByPlayerID: UUID?
     public let currentPlayerID: UUID?
+    public let winnerPlayerID: UUID?
     public let players: [PingoPlayerRef]
     public let gameState: Data
 
@@ -40,8 +44,12 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
         status: PingoMatchStatus = .draft,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
+        expiresAt: Date? = nil,
+        revision: Int = 0,
         turnNumber: Int = 0,
+        createdByPlayerID: UUID? = nil,
         currentPlayerID: UUID? = nil,
+        winnerPlayerID: UUID? = nil,
         players: [PingoPlayerRef] = [],
         gameState: Data = Data()
     ) {
@@ -51,8 +59,12 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
         self.status = status
         self.createdAt = Self.canonicalTimestamp(createdAt)
         self.updatedAt = Self.canonicalTimestamp(updatedAt)
+        self.expiresAt = expiresAt.map(Self.canonicalTimestamp)
+        self.revision = revision
         self.turnNumber = turnNumber
+        self.createdByPlayerID = createdByPlayerID
         self.currentPlayerID = currentPlayerID
+        self.winnerPlayerID = winnerPlayerID
         self.players = players
         self.gameState = gameState
     }
