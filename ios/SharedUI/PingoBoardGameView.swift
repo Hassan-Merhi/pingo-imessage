@@ -187,8 +187,7 @@ private struct CheckersBoard: View {
     }
 }
 
-private struct PendingPromotion: Identifiable {
-    let id = UUID()
+private struct PendingPromotion {
     let from: PingoGridPoint
     let to: PingoGridPoint
 }
@@ -201,6 +200,15 @@ private struct ChessBoard: View {
     @State private var selected: PingoGridPoint?
     @State private var promotion: PendingPromotion?
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 8)
+
+    private var promotionDialogPresented: Binding<Bool> {
+        Binding(
+            get: { promotion != nil },
+            set: { presented in
+                if !presented { promotion = nil }
+            }
+        )
+    }
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 0) {
@@ -232,13 +240,19 @@ private struct ChessBoard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 10)
-        .confirmationDialog("Promote pawn", item: $promotion) { pending in
-            Button("Queen") { onMove(pending.from, pending.to, .queen) }
-            Button("Rook") { onMove(pending.from, pending.to, .rook) }
-            Button("Bishop") { onMove(pending.from, pending.to, .bishop) }
-            Button("Knight") { onMove(pending.from, pending.to, .knight) }
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog("Promote pawn", isPresented: promotionDialogPresented) {
+            Button("Queen") { choosePromotion(.queen) }
+            Button("Rook") { choosePromotion(.rook) }
+            Button("Bishop") { choosePromotion(.bishop) }
+            Button("Knight") { choosePromotion(.knight) }
+            Button("Cancel", role: .cancel) { promotion = nil }
         }
+    }
+
+    private func choosePromotion(_ choice: PingoChessPromotion) {
+        guard let pending = promotion else { return }
+        promotion = nil
+        onMove(pending.from, pending.to, choice)
     }
 
     private func tapped(point: PingoGridPoint, piece: Int, destinations: [PingoGridPoint]) {
@@ -288,43 +302,67 @@ private struct SeaBattleBoard: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            if !localFleetReady {
-                placementControls
-                Text("Your fleet")
-                    .font(.headline)
-                grid(
-                    ships: Set(draftPlacements.flatMap(\.cells)),
-                    hits: [],
-                    misses: [],
-                    revealShips: true,
-                    tap: enabled ? placeDraft : nil
-                )
-                Button("Lock Fleet") {
-                    let ordered = PingoSeaBattleShip.allCases.compactMap { ship in draftPlacements.first(where: { $0.ship == ship }) }
-                    onMoves(ordered.map { .seaBattlePlace(ship: $0.ship, start: $0.start, orientation: $0.orientation) })
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.pingoPrimary)
-                .disabled(!enabled || Set(draftPlacements.map(\.ship)) != Set(PingoSeaBattleShip.allCases))
-            } else if !allFleetsReady {
-                Label("Fleet locked. Waiting for your opponent to place theirs.", systemImage: "lock.shield.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(matchComplete ? "Final battlefield" : "Opponent waters")
-                    .font(.headline)
-                targetGrid
-                Text("Your fleet")
-                    .font(.headline)
-                ownGrid
-            }
+            phaseContent
             if let placementError {
-                Text(placementError).font(.caption).foregroundStyle(.red)
+                Text(placementError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
         .onAppear {
             if draftPlacements.isEmpty { draftPlacements = state.placements[localPlayer] }
             selectFirstUnplaced()
+        }
+    }
+
+    @ViewBuilder
+    private var phaseContent: some View {
+        if !localFleetReady {
+            placementPhase
+        } else if !allFleetsReady {
+            Label("Fleet locked. Waiting for your opponent to place theirs.", systemImage: "lock.shield.fill")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        } else {
+            battlePhase
+        }
+    }
+
+    private var placementPhase: some View {
+        let placementTap: ((PingoGridPoint) -> Void)? = enabled ? { point in placeDraft(point) } : nil
+        return VStack(spacing: 14) {
+            placementControls
+            Text("Your fleet")
+                .font(.headline)
+            grid(
+                ships: Set(draftPlacements.flatMap(\.cells)),
+                hits: [],
+                misses: [],
+                revealShips: true,
+                tap: placementTap
+            )
+            Button("Lock Fleet") {
+                let ordered = PingoSeaBattleShip.allCases.compactMap { ship in
+                    draftPlacements.first(where: { $0.ship == ship })
+                }
+                onMoves(ordered.map {
+                    .seaBattlePlace(ship: $0.ship, start: $0.start, orientation: $0.orientation)
+                })
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.pingoPrimary)
+            .disabled(!enabled || Set(draftPlacements.map(\.ship)) != Set(PingoSeaBattleShip.allCases))
+        }
+    }
+
+    private var battlePhase: some View {
+        VStack(spacing: 14) {
+            Text(matchComplete ? "Final battlefield" : "Opponent waters")
+                .font(.headline)
+            targetGrid
+            Text("Your fleet")
+                .font(.headline)
+            ownGrid
         }
     }
 
@@ -336,7 +374,7 @@ private struct SeaBattleBoard: View {
                         let placed = draftPlacements.contains(where: { $0.ship == ship })
                         Button("\(ship.title) · \(ship.length)") { selectedShip = ship }
                             .buttonStyle(.bordered)
-                            .tint(selectedShip == ship ? .pingoPrimary : .secondary)
+                            .tint(selectedShip == ship ? Color.pingoPrimary : Color.gray)
                             .disabled(placed)
                     }
                 }
@@ -362,12 +400,15 @@ private struct SeaBattleBoard: View {
         let opponentShips = state.occupiedCells(player: opponent)
         let hits = fired.intersection(opponentShips)
         let misses = fired.subtracting(opponentShips)
+        let tapHandler: ((PingoGridPoint) -> Void)? = enabled && !matchComplete
+            ? { point in onMoves([.seaBattleFire(point)]) }
+            : nil
         return grid(
             ships: opponentShips,
             hits: hits,
             misses: misses,
             revealShips: matchComplete,
-            tap: enabled && !matchComplete ? { point in onMoves([.seaBattleFire(point)]) } : nil
+            tap: tapHandler
         )
     }
 
@@ -383,8 +424,15 @@ private struct SeaBattleBoard: View {
         )
     }
 
-    private func grid(ships: Set<Int>, hits: Set<Int>, misses: Set<Int>, revealShips: Bool, tap: ((PingoGridPoint) -> Void)?) -> some View {
-        LazyVGrid(columns: columns, spacing: 2) {
+    private func grid(
+        ships: Set<Int>,
+        hits: Set<Int>,
+        misses: Set<Int>,
+        revealShips: Bool,
+        tap: ((PingoGridPoint) -> Void)?
+    ) -> some View {
+        let interactive = tap != nil
+        return LazyVGrid(columns: columns, spacing: 2) {
             ForEach(0..<100, id: \.self) { index in
                 Button {
                     tap?(.init(row: index / 10, column: index % 10))
@@ -392,13 +440,20 @@ private struct SeaBattleBoard: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(cellColor(index: index, ships: ships, hits: hits, misses: misses, revealShips: revealShips))
-                        if hits.contains(index) { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(.white) }
-                        else if misses.contains(index) { Circle().fill(Color.white.opacity(0.9)).frame(width: 5, height: 5) }
+                        if hits.contains(index) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white)
+                        } else if misses.contains(index) {
+                            Circle()
+                                .fill(Color.white.opacity(0.9))
+                                .frame(width: 5, height: 5)
+                        }
                     }
                     .aspectRatio(1, contentMode: .fit)
                 }
                 .buttonStyle(.plain)
-                .disabled(tap == nil || hits.contains(index) || misses.contains(index))
+                .disabled(!interactive || hits.contains(index) || misses.contains(index))
             }
         }
         .padding(6)
@@ -406,7 +461,13 @@ private struct SeaBattleBoard: View {
         .padding(.horizontal, 4)
     }
 
-    private func cellColor(index: Int, ships: Set<Int>, hits: Set<Int>, misses: Set<Int>, revealShips: Bool) -> Color {
+    private func cellColor(
+        index: Int,
+        ships: Set<Int>,
+        hits: Set<Int>,
+        misses: Set<Int>,
+        revealShips: Bool
+    ) -> Color {
         if hits.contains(index) { return .red }
         if revealShips && ships.contains(index) { return .gray }
         if misses.contains(index) { return .blue.opacity(0.55) }
@@ -417,7 +478,13 @@ private struct SeaBattleBoard: View {
         var draftState = state
         draftState.placements[localPlayer] = draftPlacements
         do {
-            let next = try PingoSeaBattle.place(ship: selectedShip, start: point, orientation: orientation, player: localPlayer, in: draftState)
+            let next = try PingoSeaBattle.place(
+                ship: selectedShip,
+                start: point,
+                orientation: orientation,
+                player: localPlayer,
+                in: draftState
+            )
             draftPlacements = next.placements[localPlayer]
             placementError = nil
             selectFirstUnplaced()
@@ -431,7 +498,9 @@ private struct SeaBattleBoard: View {
     }
 
     private func selectFirstUnplaced() {
-        if let next = PingoSeaBattleShip.allCases.first(where: { ship in !draftPlacements.contains(where: { $0.ship == ship }) }) {
+        if let next = PingoSeaBattleShip.allCases.first(where: { ship in
+            !draftPlacements.contains(where: { $0.ship == ship })
+        }) {
             selectedShip = next
         }
     }
