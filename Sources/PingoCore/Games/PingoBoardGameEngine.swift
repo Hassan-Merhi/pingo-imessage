@@ -16,7 +16,7 @@ public enum PingoBoardGameEngine {
         case .connectFour: return (try? encoder.encode(PingoConnectFourState())) ?? Data()
         case .checkers: return (try? encoder.encode(PingoCheckersState())) ?? Data()
         case .chess: return (try? encoder.encode(PingoChessState())) ?? Data()
-        case .seaBattle: return (try? encoder.encode(PingoSeaBattleState())) ?? Data()
+        case .seaBattle: return (try? PingoSeaBattleWireCodec.encode(PingoSeaBattleState())) ?? Data()
         default: return Data()
         }
     }
@@ -96,17 +96,17 @@ public enum PingoBoardGameEngine {
                                                      nextPlayerID: opponentID, gameState: data, now: now)
 
         case (.seaBattle, .seaBattleLockFleet(let fleet)):
-            let state = try decode(PingoSeaBattleState.self, data: match.gameState)
+            let state = try PingoSeaBattleWireCodec.decode(match.gameState)
             let next = try PingoSeaBattle.lockFleet(player: actorIndex, placements: fleet, in: state)
-            let data = try encoder.encode(next)
+            let data = try PingoSeaBattleWireCodec.encode(next)
             let nextPlayerID = next.fleetReady == [true, true] ? match.players[0].id : opponentID
             return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                      nextPlayerID: nextPlayerID, gameState: data, now: now)
 
         case (.seaBattle, .seaBattleResolvePending(let fleet)):
-            let state = try decode(PingoSeaBattleState.self, data: match.gameState)
+            let state = try PingoSeaBattleWireCodec.decode(match.gameState)
             let result = try PingoSeaBattle.resolvePending(defender: actorIndex, fleet: fleet, in: state)
-            let data = try encoder.encode(result.0)
+            let data = try PingoSeaBattleWireCodec.encode(result.0)
             if let winner = result.winner {
                 return try PingoMatchReducer.completeTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                           winnerPlayerID: match.players[winner].id, gameState: data, now: now)
@@ -115,9 +115,9 @@ public enum PingoBoardGameEngine {
                                                      nextPlayerID: actorID, gameState: data, now: now)
 
         case (.seaBattle, .seaBattleFire(let point)):
-            let state = try decode(PingoSeaBattleState.self, data: match.gameState)
+            let state = try PingoSeaBattleWireCodec.decode(match.gameState)
             let next = try PingoSeaBattle.fire(at: point, player: actorIndex, in: state)
-            let data = try encoder.encode(next)
+            let data = try PingoSeaBattleWireCodec.encode(next)
             return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                      nextPlayerID: opponentID, gameState: data, now: now)
 
@@ -130,7 +130,8 @@ public enum PingoBoardGameEngine {
     public static func connectFourState(from data: Data) throws -> PingoConnectFourState { try decode(PingoConnectFourState.self, data: data) }
     public static func checkersState(from data: Data) throws -> PingoCheckersState { try decode(PingoCheckersState.self, data: data) }
     public static func chessState(from data: Data) throws -> PingoChessState { try decode(PingoChessState.self, data: data) }
-    public static func seaBattleState(from data: Data) throws -> PingoSeaBattleState { try decode(PingoSeaBattleState.self, data: data) }
+    public static func seaBattleState(from data: Data) throws -> PingoSeaBattleState { try PingoSeaBattleWireCodec.decode(data) }
+    public static func seaBattleStateData(_ state: PingoSeaBattleState) throws -> Data { try PingoSeaBattleWireCodec.encode(state) }
 
     private static func decode<T: Decodable>(_ type: T.Type, data: Data) throws -> T {
         guard !data.isEmpty else { throw PingoGameRuleError.invalidState }
