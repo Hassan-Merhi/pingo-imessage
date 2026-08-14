@@ -141,9 +141,14 @@ struct PingoIncomingMatchView: View {
         if payload.match.currentPlayerID == localProfile.id {
             if payload.match.gameID == .seaBattle,
                let state = try? PingoBoardGameEngine.seaBattleState(from: payload.match.gameState),
-               let index = payload.match.players.firstIndex(where: { $0.id == localProfile.id }),
-               !state.fleetReady(player: index) {
-                return "Place your fleet, then lock it in and send the setup."
+               let index = payload.match.players.firstIndex(where: { $0.id == localProfile.id }) {
+                let ready = state.fleetReady.indices.contains(index) && state.fleetReady[index]
+                if !ready {
+                    return "Place your fleet, then lock it in and send the setup."
+                }
+                if let pending = state.pendingShot, pending.shooter != index {
+                    return "Resolve their shot and choose your return shot; Pingo sends both in one updated card."
+                }
             }
             return "Make your move, then send the updated Pingo card."
         }
