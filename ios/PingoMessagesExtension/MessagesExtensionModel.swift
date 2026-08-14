@@ -14,7 +14,7 @@ final class MessagesExtensionModel: ObservableObject {
     @Published var isStorePresented = false
     @Published var remoteParticipantCount = 0
 
-    let storeManager = PingoStoreManager()
+    let storeManager: PingoStoreManager
 
     private let identityStore: PingoIdentityStore
     private let progressionStore: PingoProgressionStore
@@ -28,6 +28,7 @@ final class MessagesExtensionModel: ObservableObject {
         identityStore = identity
         self.progressionStore = progressionStore
         apiClient = PingoAPIClient()
+        storeManager = PingoStoreManager()
 
         let storedProfile = identity.loadOrCreateProfile()
         profile = storedProfile
