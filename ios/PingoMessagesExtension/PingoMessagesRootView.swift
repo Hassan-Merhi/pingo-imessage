@@ -7,6 +7,7 @@ struct PingoMessagesRootView: View {
     let onRequestExpanded: () -> Void
     let onChallenge: (PingoGameID) -> Void
     let onAccept: () -> Void
+    let onMoves: ([PingoGameMove]) -> Void
     let onResign: () -> Void
 
     var body: some View {
@@ -21,6 +22,7 @@ struct PingoMessagesRootView: View {
                                 payload: payload,
                                 localProfile: model.profile,
                                 onAccept: onAccept,
+                                onMoves: onMoves,
                                 onResign: onResign,
                                 onClose: model.clearIncomingMatch
                             )

@@ -52,7 +52,7 @@ struct PingoHomeView: View {
     }
 
     private var footer: some View {
-        Text("10 launch games • Pingo profiles • iMessage challenges")
+        Text("5 playable games • 10-game launch catalog • iMessage challenges")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -63,10 +63,23 @@ struct PingoHomeView: View {
 private struct GameTile: View {
     let game: PingoGameDescriptor
 
+    private var isPlayable: Bool {
+        PingoBoardGameEngine.supportedGames.contains(game.id)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(game.symbol)
-                .font(.system(size: 32))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top) {
+                Text(game.symbol)
+                    .font(.system(size: 32))
+                Spacer()
+                Text(isPlayable ? "READY" : "SOON")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(isPlayable ? Color.pingoPrimary : .secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.05), in: Capsule())
+            }
             Text(game.name)
                 .font(.headline)
                 .foregroundStyle(Color.pingoInk)
@@ -79,7 +92,7 @@ private struct GameTile: View {
         .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.pingoPrimary.opacity(0.12))
+                .strokeBorder(Color.pingoPrimary.opacity(isPlayable ? 0.2 : 0.08))
         }
         .contentShape(Rectangle())
     }
@@ -90,23 +103,31 @@ private struct ChallengeGameView: View {
     let onChallenge: () -> Void
     @Environment(\.dismiss) private var dismiss
 
+    private var isPlayable: Bool {
+        PingoBoardGameEngine.supportedGames.contains(game.id)
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Text(game.symbol)
                 .font(.system(size: 64))
             Text(game.name)
                 .font(.title.bold())
-            Text("Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept and continue the match.")
+            Text(isPlayable
+                 ? "Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept, play, and send turns back."
+                 : "This game is already in Pingo's launch catalog, but its full gameplay engine arrives in the next build wave.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
-            Button("Send Challenge") {
-                onChallenge()
-                dismiss()
+            if isPlayable {
+                Button("Send Challenge") {
+                    onChallenge()
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.pingoPrimary)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.pingoPrimary)
-            Button("Cancel") { dismiss() }
+            Button(isPlayable ? "Cancel" : "Close") { dismiss() }
                 .buttonStyle(.bordered)
         }
         .padding(28)

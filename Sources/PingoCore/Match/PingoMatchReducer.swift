@@ -42,6 +42,7 @@ public enum PingoMatchReducer {
         }
 
         let players = match.players + [.init(id: opponent.id, displayName: opponent.username)]
+        let initialState = PingoBoardGameEngine.initialStateData(for: match.gameID)
         return PingoMatchEnvelope(
             id: match.id,
             gameID: match.gameID,
@@ -54,7 +55,7 @@ public enum PingoMatchReducer {
             createdByPlayerID: match.createdByPlayerID,
             currentPlayerID: match.createdByPlayerID,
             players: players,
-            gameState: match.gameState
+            gameState: initialState.isEmpty ? match.gameState : initialState
         )
     }
 
@@ -72,9 +73,7 @@ public enum PingoMatchReducer {
             throw PingoMatchTransitionError.actorNotInMatch
         }
         guard match.currentPlayerID == actorID else { throw PingoMatchTransitionError.notActorsTurn }
-        guard nextPlayerID != actorID,
-              match.players.contains(where: { $0.id == nextPlayerID })
-        else {
+        guard match.players.contains(where: { $0.id == nextPlayerID }) else {
             throw PingoMatchTransitionError.invalidNextPlayer
         }
 
@@ -89,6 +88,42 @@ public enum PingoMatchReducer {
             turnNumber: match.turnNumber + 1,
             createdByPlayerID: match.createdByPlayerID,
             currentPlayerID: nextPlayerID,
+            players: match.players,
+            gameState: gameState
+        )
+    }
+
+    public static func completeTurn(
+        _ match: PingoMatchEnvelope,
+        actorID: UUID,
+        expectedRevision: Int,
+        winnerPlayerID: UUID?,
+        gameState: Data,
+        now: Date = Date()
+    ) throws -> PingoMatchEnvelope {
+        guard match.revision == expectedRevision else { throw PingoMatchTransitionError.staleRevision }
+        guard match.status == .active else { throw PingoMatchTransitionError.invalidStatus }
+        guard match.players.contains(where: { $0.id == actorID }) else {
+            throw PingoMatchTransitionError.actorNotInMatch
+        }
+        guard match.currentPlayerID == actorID else { throw PingoMatchTransitionError.notActorsTurn }
+        if let winnerPlayerID,
+           !match.players.contains(where: { $0.id == winnerPlayerID }) {
+            throw PingoMatchTransitionError.invalidNextPlayer
+        }
+
+        return PingoMatchEnvelope(
+            id: match.id,
+            gameID: match.gameID,
+            status: .completed,
+            createdAt: match.createdAt,
+            updatedAt: now,
+            expiresAt: match.expiresAt,
+            revision: match.revision + 1,
+            turnNumber: match.turnNumber + 1,
+            createdByPlayerID: match.createdByPlayerID,
+            currentPlayerID: nil,
+            winnerPlayerID: winnerPlayerID,
             players: match.players,
             gameState: gameState
         )
