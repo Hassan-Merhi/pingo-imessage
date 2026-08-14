@@ -224,7 +224,7 @@ struct PingoIncomingMatchView: View {
 
     private var matchSubtitle: String {
         if payload.match.series != nil { return "\(seriesGameLabel) • \(payload.match.series?.format.title ?? "Series")" }
-        switch payload.match.status {
+        return switch payload.match.status {
         case .active: "Move \(payload.match.turnNumber + 1)"
         case .completed, .resigned: "Final result"
         case .awaitingOpponent: "Challenge"

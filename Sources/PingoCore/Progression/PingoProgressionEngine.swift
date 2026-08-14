@@ -113,30 +113,100 @@ public enum PingoProgression {
 
     public static func merging(local: PingoProgressionState, remote: PingoProgressionSnapshot) -> PingoProgressionState {
         var next = local
-        next.xp = max(local.xp, remote.xp)
-        next.achievements.formUnion(remote.achievements)
-        for (game, count) in remote.gameCounts {
-            next.gameCounts[game] = max(next.gameCounts[game, default: 0], count)
+
+        // Reconcile only results that have an actual per-match record. Never union a remote
+        // processed ID without its result, because doing so would make missing aggregate stats
+        // permanently unrecoverable on the next sync.
+        let remoteOnlyEntries = remote.history
+            .filter { !next.processedMatchIDs.contains($0.id) }
+            .sorted { $0.playedAt < $1.playedAt }
+
+        for entry in remoteOnlyEntries {
+            applySyncedHistoryEntry(entry, to: &next)
         }
+
+        next.achievements.formUnion(remote.achievements)
 
         var historyByID = Dictionary(uniqueKeysWithValues: next.history.map { ($0.id, $0) })
         for entry in remote.history { historyByID[entry.id] = entry }
         next.history = historyByID.values.sorted(by: { $0.playedAt > $1.playedAt })
         if next.history.count > maximumHistory { next.history = Array(next.history.prefix(maximumHistory)) }
-        next.processedMatchIDs.formUnion(remote.processedMatchIDs)
-        next.processedMatchIDs.formUnion(next.history.map(\.id))
 
-        let localGames = local.gamesPlayed
-        let remoteGames = remote.wins + remote.losses + remote.draws
-        if remoteGames > localGames {
-            next.wins = remote.wins
-            next.losses = remote.losses
-            next.draws = remote.draws
-            next.currentStreak = remote.currentStreak
-            next.bestStreak = max(local.bestStreak, remote.bestStreak)
-            next.opponentRecords = remote.opponentRecords
-        }
+        next.currentStreak = currentWinStreak(in: next.history)
+        next.bestStreak = max(max(next.bestStreak, remote.bestStreak), longestWinStreak(in: next.history))
+        reconcileOpponentStreaks(in: &next)
         next.updatedAt = max(local.updatedAt, remote.updatedAt)
         return next
+    }
+
+    private static func applySyncedHistoryEntry(
+        _ entry: PingoMatchHistoryEntry,
+        to state: inout PingoProgressionState
+    ) {
+        guard !state.processedMatchIDs.contains(entry.id) else { return }
+
+        state.processedMatchIDs.insert(entry.id)
+        state.xp += xpAward(for: entry.result)
+        switch entry.result {
+        case .win:
+            state.wins += 1
+        case .loss:
+            state.losses += 1
+        case .draw:
+            state.draws += 1
+        }
+
+        state.gameCounts[entry.gameID.rawValue, default: 0] += 1
+        state.updateOpponentRecord(
+            opponent: .init(id: entry.opponentID, displayName: entry.opponentName),
+            result: entry.result,
+            playedAt: entry.playedAt
+        )
+        state.history.removeAll(where: { $0.id == entry.id })
+        state.history.append(entry)
+    }
+
+    private static func currentWinStreak(in history: [PingoMatchHistoryEntry]) -> Int {
+        history
+            .sorted(by: { $0.playedAt > $1.playedAt })
+            .prefix(while: { $0.result == .win })
+            .count
+    }
+
+    private static func longestWinStreak(in history: [PingoMatchHistoryEntry]) -> Int {
+        var longest = 0
+        var current = 0
+        for entry in history.sorted(by: { $0.playedAt < $1.playedAt }) {
+            if entry.result == .win {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 0
+            }
+        }
+        return longest
+    }
+
+    private static func reconcileOpponentStreaks(in state: inout PingoProgressionState) {
+        for index in state.opponentRecords.indices {
+            let opponentID = state.opponentRecords[index].opponentID
+            let history = state.history
+                .filter { $0.opponentID == opponentID }
+                .sorted(by: { $0.playedAt > $1.playedAt })
+            guard !history.isEmpty else { continue }
+
+            state.opponentRecords[index].currentStreak = history.prefix(while: { $0.result == .win }).count
+            state.opponentRecords[index].bestStreak = max(
+                state.opponentRecords[index].bestStreak,
+                longestWinStreak(in: history)
+            )
+            state.opponentRecords[index].lastPlayedAt = max(
+                state.opponentRecords[index].lastPlayedAt ?? .distantPast,
+                history[0].playedAt
+            )
+        }
+        state.opponentRecords.sort {
+            ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast)
+        }
     }
 }

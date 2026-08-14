@@ -83,6 +83,31 @@ final class Wave5Tests: XCTestCase {
         XCTAssertFalse(next.gameState.isEmpty)
     }
 
+    func testChessSeriesAlternatesWhiteSeatWithoutFlippingSeriesScore() throws {
+        let match = activeMatch(game: .chess, series: .init(format: .bestOf3))
+        let first = try PingoMatchReducer.completeTurn(
+            match,
+            actorID: a,
+            expectedRevision: match.revision,
+            winnerPlayerID: a,
+            gameState: match.gameState
+        )
+
+        let secondGame = try PingoMatchReducer.continueSeries(first, actorID: a)
+        XCTAssertEqual(secondGame.players.map(\.id), [b, a])
+        XCTAssertEqual(secondGame.currentPlayerID, b)
+
+        let second = try PingoMatchReducer.completeTurn(
+            secondGame,
+            actorID: b,
+            expectedRevision: secondGame.revision,
+            winnerPlayerID: b,
+            gameState: secondGame.gameState
+        )
+        XCTAssertEqual(second.series?.wins, [1, 1])
+        XCTAssertEqual(second.series?.gameNumber, 3)
+    }
+
     func testProgressionAwardsXPStatsHistoryAndFriendRecordOnce() throws {
         let base = activeMatch()
         let finished = try PingoMatchReducer.completeTurn(
@@ -105,6 +130,52 @@ final class Wave5Tests: XCTestCase {
         XCTAssertEqual(second.xp, first.xp)
         XCTAssertEqual(second.gamesPlayed, first.gamesPlayed)
         XCTAssertEqual(second.history.count, 1)
+    }
+
+    func testProgressionMergeReconcilesDisjointResultsPerMatch() throws {
+        let firstMatch = PingoMatchEnvelope(
+            id: UUID(),
+            gameID: .ticTacToe,
+            status: .completed,
+            updatedAt: Date(timeIntervalSince1970: 100),
+            createdByPlayerID: a,
+            winnerPlayerID: a,
+            players: [.init(id: a, displayName: "alpha"), .init(id: b, displayName: "bravo")]
+        )
+        let secondMatch = PingoMatchEnvelope(
+            id: UUID(),
+            gameID: .ticTacToe,
+            status: .completed,
+            updatedAt: Date(timeIntervalSince1970: 200),
+            createdByPlayerID: a,
+            winnerPlayerID: b,
+            players: [.init(id: a, displayName: "alpha"), .init(id: b, displayName: "bravo")]
+        )
+
+        let local = try PingoProgression.applyingResult(from: firstMatch, localPlayerID: a, to: .init())
+        let remote = try PingoProgression.applyingResult(from: secondMatch, localPlayerID: a, to: .init())
+        let merged = PingoProgression.merging(local: local, remote: remote.snapshot())
+
+        XCTAssertEqual(merged.wins, 1)
+        XCTAssertEqual(merged.losses, 1)
+        XCTAssertEqual(merged.draws, 0)
+        XCTAssertEqual(merged.gamesPlayed, 2)
+        XCTAssertEqual(merged.xp, 150)
+        XCTAssertEqual(merged.gameCounts[PingoGameID.ticTacToe.rawValue], 2)
+        XCTAssertTrue(merged.processedMatchIDs.contains(firstMatch.id))
+        XCTAssertTrue(merged.processedMatchIDs.contains(secondMatch.id))
+        XCTAssertEqual(merged.opponentRecords.first?.wins, 1)
+        XCTAssertEqual(merged.opponentRecords.first?.losses, 1)
+        XCTAssertEqual(merged.currentStreak, 0)
+    }
+
+    func testProgressionMergeDoesNotMarkUnreconciledRemoteIDProcessed() {
+        let orphanID = UUID()
+        var remote = PingoProgressionState()
+        remote.processedMatchIDs.insert(orphanID)
+
+        let merged = PingoProgression.merging(local: .init(), remote: remote.snapshot())
+        XCTAssertFalse(merged.processedMatchIDs.contains(orphanID))
     }
 
     func testStreakAchievementsUnlock() throws {

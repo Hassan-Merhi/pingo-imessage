@@ -117,7 +117,7 @@ public enum PingoMatchReducer {
             throw PingoMatchTransitionError.invalidNextPlayer
         }
 
-        let winnerIndex = winnerPlayerID.flatMap { id in match.players.firstIndex(where: { $0.id == id }) }
+        let winnerIndex = seriesPlayerIndex(for: winnerPlayerID, in: match)
         let updatedSeries = match.series?.recording(winnerIndex: winnerIndex)
         return PingoMatchEnvelope(
             id: match.id,
@@ -149,8 +149,8 @@ public enum PingoMatchReducer {
             throw PingoMatchTransitionError.actorNotInMatch
         }
 
-        let winnerIndex = match.players.count == 2 ? 1 - actorIndex : nil
-        let winner = winnerIndex.map { match.players[$0].id }
+        let winner = match.players.count == 2 ? match.players[1 - actorIndex].id : nil
+        let winnerIndex = seriesPlayerIndex(for: winner, in: match)
         let updatedSeries = match.series?.recording(winnerIndex: winnerIndex)
         return PingoMatchEnvelope(
             id: match.id,
@@ -188,7 +188,27 @@ public enum PingoMatchReducer {
             throw PingoMatchTransitionError.notActorsTurn
         }
 
+        guard let host = match.players.first(where: { $0.id == match.createdByPlayerID }),
+              let guest = match.players.first(where: { $0.id != match.createdByPlayerID }) else {
+            throw PingoMatchTransitionError.invalidStatus
+        }
+
+        let canonicalPlayers = [host, guest]
         let starterIndex = max(0, series.gameNumber - 1) % 2
+        let players: [PingoPlayerRef]
+        let currentPlayerID: UUID
+
+        if match.gameID == .chess {
+            // Chess roles are tied to player index: index 0 is White. Reorder the seats on
+            // alternating games so the scheduled starter is always White, while series scoring
+            // remains anchored to host/guest identity through seriesPlayerIndex(for:in:).
+            players = starterIndex == 0 ? canonicalPlayers : [guest, host]
+            currentPlayerID = players[0].id
+        } else {
+            players = canonicalPlayers
+            currentPlayerID = canonicalPlayers[starterIndex].id
+        }
+
         let boardState = PingoBoardGameEngine.initialStateData(for: match.gameID)
         let initialState = boardState.isEmpty ? PingoPhysicsGameEngine.initialStateData(for: match.gameID) : boardState
         return PingoMatchEnvelope(
@@ -200,10 +220,17 @@ public enum PingoMatchReducer {
             revision: 0,
             turnNumber: 0,
             createdByPlayerID: match.createdByPlayerID,
-            currentPlayerID: match.players[starterIndex].id,
-            players: match.players,
+            currentPlayerID: currentPlayerID,
+            players: players,
             gameState: initialState,
             series: series
         )
+    }
+
+    private static func seriesPlayerIndex(for playerID: UUID?, in match: PingoMatchEnvelope) -> Int? {
+        guard let playerID else { return nil }
+        if playerID == match.createdByPlayerID { return 0 }
+        guard match.players.contains(where: { $0.id == playerID }) else { return nil }
+        return 1
     }
 }
