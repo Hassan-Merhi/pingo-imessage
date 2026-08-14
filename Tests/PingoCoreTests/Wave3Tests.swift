@@ -119,6 +119,31 @@ final class Wave3Tests: XCTestCase {
         XCTAssertTrue(state.fleetReady(player: 0))
     }
 
+    func testSeaBattleRejectsHorizontalAndVerticalEdgeWrapping() {
+        XCTAssertThrowsError(
+            try PingoSeaBattle.place(
+                ship: .carrier,
+                start: .init(row: 2, column: 8),
+                orientation: .horizontal,
+                player: 0,
+                in: .init()
+            )
+        ) { error in
+            XCTAssertEqual(error as? PingoGameRuleError, .outOfBounds)
+        }
+        XCTAssertThrowsError(
+            try PingoSeaBattle.place(
+                ship: .battleship,
+                start: .init(row: 8, column: 3),
+                orientation: .vertical,
+                player: 0,
+                in: .init()
+            )
+        ) { error in
+            XCTAssertEqual(error as? PingoGameRuleError, .outOfBounds)
+        }
+    }
+
     func testSeaBattleWinAfterLastShipCellHit() throws {
         func readyFleet(player: Int, state: PingoSeaBattleState) throws -> PingoSeaBattleState {
             var state = state
@@ -139,6 +164,41 @@ final class Wave3Tests: XCTestCase {
             winner = result.winner
         }
         XCTAssertEqual(winner, 0)
+    }
+
+    func testNearCompleteSeaBattleStillFitsIMessagePayload() throws {
+        func readyFleet(player: Int, state: PingoSeaBattleState) throws -> PingoSeaBattleState {
+            var state = state
+            state = try PingoSeaBattle.place(ship: .carrier, start: .init(row: 0, column: 0), orientation: .horizontal, player: player, in: state)
+            state = try PingoSeaBattle.place(ship: .battleship, start: .init(row: 1, column: 0), orientation: .horizontal, player: player, in: state)
+            state = try PingoSeaBattle.place(ship: .cruiser, start: .init(row: 2, column: 0), orientation: .horizontal, player: player, in: state)
+            state = try PingoSeaBattle.place(ship: .submarine, start: .init(row: 3, column: 0), orientation: .horizontal, player: player, in: state)
+            state = try PingoSeaBattle.place(ship: .destroyer, start: .init(row: 4, column: 0), orientation: .horizontal, player: player, in: state)
+            return state
+        }
+
+        var state = try readyFleet(player: 0, state: .init())
+        state = try readyFleet(player: 1, state: state)
+        state.shots = [Array(0..<90), Array(10..<100)]
+        let gameState = try JSONEncoder().encode(state)
+        let sender = PingoPublicProfile(username: "payloadtester")
+        let opponent = UUID()
+        let match = PingoMatchEnvelope(
+            gameID: .seaBattle,
+            status: .active,
+            revision: 185,
+            turnNumber: 180,
+            createdByPlayerID: sender.id,
+            currentPlayerID: sender.id,
+            players: [
+                .init(id: sender.id, displayName: sender.username),
+                .init(id: opponent, displayName: "opponent")
+            ],
+            gameState: gameState
+        )
+        let payload = PingoMessagePayload(action: .turn, sender: sender, match: match)
+        let url = try PingoMessageTransport.makeURL(payload: payload, baseURL: URL(string: "https://pingo.invalid/m")!)
+        XCTAssertLessThanOrEqual(url.absoluteString.count, PingoMessageTransport.maximumURLLength)
     }
 
     func testBoardStatePayloadsStaySmallEnoughForIMessage() {
