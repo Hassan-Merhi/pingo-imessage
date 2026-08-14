@@ -4,218 +4,203 @@ import SwiftUI
 struct PingoIncomingMatchView: View {
     let payload: PingoMessagePayload
     let localProfile: PingoPublicProfile
-    let entitlements: Set<PingoEntitlementID>
     let onAccept: () -> Void
-    let onMoves: ([PingoGameMove]) -> Void
-    let onPhysicsMove: (PingoPhysicsMove) -> Void
-    let onContinueSeries: () -> Void
+    let onOpenGame: () -> Void
     let onResign: () -> Void
-    let onOpenStore: () -> Void
-    let onClose: () -> Void
-
-    private var game: PingoGameDescriptor? {
-        PingoGameCatalog.launch.first(where: { $0.id == payload.match.gameID })
-    }
-
-    private var localIsPlayer: Bool {
-        payload.match.players.contains(where: { $0.id == localProfile.id })
-    }
-
-    private var hasPlayableGame: Bool {
-        PingoPlayableGameRegistry.supportedGames.contains(payload.match.gameID)
-    }
-
-    private var localCanPlay: Bool {
-        PingoAccessPolicy.canPlay(payload.match.gameID, entitlements: entitlements)
-    }
-
-    private var isPhysicsGame: Bool {
-        PingoPhysicsGameEngine.supportedGames.contains(payload.match.gameID)
-    }
-
-    private var localIsSeriesHost: Bool {
-        payload.match.createdByPlayerID == localProfile.id
-    }
+    let onContinueSeries: () -> Void
+    let onRematch: () -> Void
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                HStack(spacing: 12) {
-                    Text(game?.symbol ?? "🎮")
-                        .font(.system(size: 48))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(game?.name ?? "Pingo Match")
-                            .font(.title2.bold())
-                        Text(matchSubtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if !localCanPlay {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                statusCard
-                if payload.match.series != nil { seriesCard }
-                if hasPlayableGame,
-                   localCanPlay,
-                   localIsPlayer,
-                   payload.match.status == .active || payload.match.status == .completed {
-                    if isPhysicsGame {
-                        PingoPhysicsGameView(match: payload.match, localProfile: localProfile, onMove: onPhysicsMove)
-                    } else {
-                        PingoBoardGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves)
-                    }
-                }
-                playerList
+                header
+                matchCard
+                seriesCard
                 actions
-                Button("Back to games", action: onClose)
-                    .buttonStyle(.bordered)
             }
-            .padding(18)
+            .padding(20)
         }
-        .background(Color.pingoSurface.ignoresSafeArea())
+        .background(Color.pingoBackground.ignoresSafeArea())
+    }
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            Text(PingoGameCatalog.game(id: payload.match.gameID)?.symbol ?? "🎮")
+                .font(.system(size: 52))
+            Text(PingoGameCatalog.game(id: payload.match.gameID)?.name ?? "Pingo")
+                .font(.title2.bold())
+            Text(matchSubtitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+    }
+
+    private var matchCard: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                playerColumn(player: primaryPlayer, scoreIndex: 0)
+                Text("VS")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                playerColumn(player: secondaryPlayer, scoreIndex: 1)
+            }
+
+            statusDetail
+        }
+        .padding(18)
+        .background(Color.pingoCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     @ViewBuilder
-    private var statusCard: some View {
-        VStack(spacing: 6) {
-            if !localCanPlay {
-                Text("Premium Game").font(.headline)
-                Text("Unlock the Premium Game Pack to accept or continue this match.")
+    private var statusDetail: some View {
+        switch payload.match.status {
+        case .awaitingOpponent:
+            if payload.match.createdByPlayerID == localProfile.id {
+                Label("Waiting for opponent", systemImage: "clock")
                     .foregroundStyle(.secondary)
             } else {
-                switch payload.match.status {
-                case .awaitingOpponent:
-                    if payload.sender.id == localProfile.id {
-                        Text("Challenge ready").font(.headline)
-                        Text("Waiting for someone in this chat to accept.").foregroundStyle(.secondary)
-                    } else {
-                        Text("@\(payload.sender.username) challenged you").font(.headline)
-                        Text("Accept to join this Pingo match.").foregroundStyle(.secondary)
-                    }
-                case .active:
-                    Text(payload.match.currentPlayerID == localProfile.id ? "Your turn" : "Opponent's turn")
-                        .font(.headline)
-                    Text(turnText).foregroundStyle(.secondary)
-                case .resigned:
-                    Text("Match ended").font(.headline)
-                    Text(resultText).foregroundStyle(.secondary)
-                case .completed:
-                    Text("Match complete").font(.headline)
-                    Text(resultText).foregroundStyle(.secondary)
-                case .expired:
-                    Text("Challenge expired").font(.headline)
-                    Text("Start a new challenge from the game list.").foregroundStyle(.secondary)
-                case .draft:
-                    Text("Preparing match").font(.headline)
-                }
-            }
-        }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private var seriesCard: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text(payload.match.series?.format.title ?? "Series")
-                    .font(.headline)
-                Spacer()
-                Text(seriesGameLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            HStack(spacing: 20) {
-                VStack(spacing: 2) {
-                    Text(payload.match.players.first?.displayName ?? "Player 1")
-                        .font(.caption)
-                        .lineLimit(1)
-                    Text("\(seriesScore(at: 0))")
-                        .font(.title2.bold())
-                }
-                Text("–").font(.headline).foregroundStyle(.secondary)
-                VStack(spacing: 2) {
-                    Text(payload.match.players.count > 1 ? payload.match.players[1].displayName : "Player 2")
-                        .font(.caption)
-                        .lineLimit(1)
-                    Text("\(seriesScore(at: 1))")
-                        .font(.title2.bold())
-                }
-            }
-            if let series = payload.match.series, series.completed, let winnerIndex = series.winnerPlayerIndex,
-               payload.match.players.indices.contains(winnerIndex) {
-                Text("@\(payload.match.players[winnerIndex].displayName) won the series")
-                    .font(.caption.weight(.semibold))
+                Label("@\(payload.sender.username) challenged you", systemImage: "bolt.fill")
                     .foregroundStyle(Color.pingoPrimary)
             }
+        case .active:
+            if payload.match.currentPlayerID == localProfile.id {
+                Label("Your turn", systemImage: "hand.tap.fill")
+                    .foregroundStyle(Color.pingoPrimary)
+            } else {
+                Label("Waiting for opponent's move", systemImage: "clock")
+                    .foregroundStyle(.secondary)
+            }
+        case .completed, .resigned:
+            resultLabel
+        case .expired:
+            Label("This match expired", systemImage: "clock.badge.xmark")
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private var playerList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Players").font(.headline)
-            ForEach(Array(payload.match.players.enumerated()), id: \.element.id) { index, player in
+    @ViewBuilder
+    private var resultLabel: some View {
+        if let winnerID = payload.match.winnerPlayerID {
+            if winnerID == localProfile.id {
+                Label("You won!", systemImage: "trophy.fill")
+                    .foregroundStyle(Color.pingoPrimary)
+            } else {
+                Label("@\(winnerName(for: winnerID)) won", systemImage: "flag.checkered")
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Label("Draw", systemImage: "equal.circle")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var seriesCard: some View {
+        if let series = payload.match.series {
+            VStack(spacing: 10) {
                 HStack {
-                    Image(systemName: player.id == localProfile.id ? "person.crop.circle.fill" : "person.crop.circle")
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("@\(player.displayName)")
-                        if payload.match.gameID == .chess {
-                            Text(index == 0 ? "White" : "Black").font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
+                    Label(series.format.title, systemImage: "list.number")
+                        .font(.subheadline.bold())
                     Spacer()
-                    if player.id == payload.match.currentPlayerID {
-                        Text("Turn")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.pingoPrimary)
-                    }
+                    Text(series.scoreText)
+                        .font(.title3.monospacedDigit().bold())
+                }
+
+                if series.completed, let winnerIndex = series.winnerPlayerIndex {
+                    let winner = seriesPlayer(at: winnerIndex)
+                    Label("Series winner: @\(winner?.displayName ?? "player")", systemImage: "crown.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.pingoPrimary)
+                } else {
+                    Text("\(seriesGameLabel) of up to \(series.format.maximumGames)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
+            .padding(14)
+            .background(Color.pingoPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     @ViewBuilder
     private var actions: some View {
-        if !localCanPlay {
-            Button("Unlock Premium Game Pack", action: onOpenStore)
-                .buttonStyle(.borderedProminent)
-                .tint(.pingoPrimary)
-        } else if payload.match.status == .awaitingOpponent,
-                  payload.sender.id != localProfile.id,
-                  !localIsPlayer {
-            Button("Accept Challenge", action: onAccept)
-                .buttonStyle(.borderedProminent)
-                .tint(.pingoPrimary)
-        } else if payload.match.status == .active, localIsPlayer {
-            Button("Resign Match", role: .destructive, action: onResign)
-                .buttonStyle(.bordered)
-        } else if (payload.match.status == .completed || payload.match.status == .resigned),
-                  let series = payload.match.series,
-                  !series.completed,
-                  localIsPlayer {
-            if localIsSeriesHost {
-                Button("Continue \(series.format.title)", action: onContinueSeries)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pingoPrimary)
+        VStack(spacing: 10) {
+            switch payload.match.status {
+            case .awaitingOpponent:
+                if payload.match.createdByPlayerID != localProfile.id {
+                    Button("Accept Challenge", action: onAccept)
+                        .buttonStyle(PingoPrimaryButtonStyle())
+                }
+            case .active:
+                Button(payload.match.currentPlayerID == localProfile.id ? "Play Your Turn" : "Open Match", action: onOpenGame)
+                    .buttonStyle(PingoPrimaryButtonStyle())
+                Button("Resign", role: .destructive, action: onResign)
+                    .font(.subheadline.weight(.semibold))
+            case .completed, .resigned:
+                completedActions
+            case .expired:
+                Button("Start a New Game", action: onRematch)
+                    .buttonStyle(PingoPrimaryButtonStyle())
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var completedActions: some View {
+        if let series = payload.match.series, !series.completed {
+            if payload.match.createdByPlayerID == localProfile.id {
+                Button("Send \(nextSeriesGameLabel)", action: onContinueSeries)
+                    .buttonStyle(PingoPrimaryButtonStyle())
             } else {
                 Text("Waiting for the series host to send the next game.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
+        } else {
+            Button("Rematch", action: onRematch)
+                .buttonStyle(PingoPrimaryButtonStyle())
         }
     }
 
+    private var primaryPlayer: PingoPlayerRef? {
+        seriesPlayer(at: 0) ?? payload.match.players.first
+    }
+
+    private var secondaryPlayer: PingoPlayerRef? {
+        seriesPlayer(at: 1) ?? payload.match.players.dropFirst().first
+    }
+
+    private func seriesPlayer(at index: Int) -> PingoPlayerRef? {
+        guard payload.match.players.count == 2 else { return payload.match.players.indices.contains(index) ? payload.match.players[index] : nil }
+        if index == 0 {
+            return payload.match.players.first(where: { $0.id == payload.match.createdByPlayerID })
+        }
+        return payload.match.players.first(where: { $0.id != payload.match.createdByPlayerID })
+    }
+
+    private func playerColumn(player: PingoPlayerRef?, scoreIndex: Int) -> some View {
+        VStack(spacing: 4) {
+            Text(player?.id == localProfile.id ? "You" : "@\(player?.displayName ?? "player")")
+                .font(.subheadline.bold())
+                .lineLimit(1)
+            if payload.match.series != nil {
+                Text("\(seriesScore(at: scoreIndex))")
+                    .font(.title.bold().monospacedDigit())
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func winnerName(for id: UUID) -> String {
+        payload.match.players.first(where: { $0.id == id })?.displayName ?? payload.sender.username
+    }
+
+    private var nextSeriesGameLabel: String {
+        guard let series = payload.match.series else { return "Next Game" }
+        return "Game \(series.gameNumber)"
+    }
 
     private func seriesScore(at index: Int) -> Int {
         guard let wins = payload.match.series?.wins, wins.indices.contains(index) else { return 0 }
@@ -224,7 +209,7 @@ struct PingoIncomingMatchView: View {
 
     private var matchSubtitle: String {
         if payload.match.series != nil { return "\(seriesGameLabel) • \(payload.match.series?.format.title ?? "Series")" }
-        switch payload.match.status {
+        return switch payload.match.status {
         case .active: "Move \(payload.match.turnNumber + 1)"
         case .completed, .resigned: "Final result"
         case .awaitingOpponent: "Challenge"
@@ -241,28 +226,5 @@ struct PingoIncomingMatchView: View {
             game = series.gameNumber
         }
         return "Game \(game)"
-    }
-
-    private var turnText: String {
-        guard hasPlayableGame else { return "This game's engine is not enabled in this build." }
-        if payload.match.currentPlayerID == localProfile.id {
-            if payload.match.gameID == .seaBattle,
-               let state = try? PingoBoardGameEngine.seaBattleState(from: payload.match.gameState),
-               let index = payload.match.players.firstIndex(where: { $0.id == localProfile.id }) {
-                let ready = state.fleetReady.indices.contains(index) && state.fleetReady[index]
-                if !ready { return "Place your fleet, then lock it in and send the setup." }
-                if let pending = state.pendingShot, pending.shooter != index {
-                    return "Resolve their shot and choose your return shot; Pingo sends both in one updated card."
-                }
-            }
-            if isPhysicsGame { return "Set your aim and power, simulate the shot, then send the updated Pingo card." }
-            return "Make your move, then send the updated Pingo card."
-        }
-        return "Open the newest Pingo card when your opponent sends their move."
-    }
-
-    private var resultText: String {
-        guard let winner = payload.match.winnerPlayerID else { return "The match ended in a draw." }
-        return winner == localProfile.id ? "You won this match." : "The other player won this match."
     }
 }
