@@ -6,6 +6,7 @@ struct PingoIncomingMatchView: View {
     let localProfile: PingoPublicProfile
     let onAccept: () -> Void
     let onMoves: ([PingoGameMove]) -> Void
+    let onPhysicsMove: (PingoPhysicsMove) -> Void
     let onResign: () -> Void
     let onClose: () -> Void
 
@@ -17,8 +18,12 @@ struct PingoIncomingMatchView: View {
         payload.match.players.contains(where: { $0.id == localProfile.id })
     }
 
-    private var hasPlayableWave3Game: Bool {
-        PingoBoardGameEngine.supportedGames.contains(payload.match.gameID)
+    private var hasPlayableGame: Bool {
+        PingoPlayableGameRegistry.supportedGames.contains(payload.match.gameID)
+    }
+
+    private var isPhysicsGame: Bool {
+        PingoPhysicsGameEngine.supportedGames.contains(payload.match.gameID)
     }
 
     var body: some View {
@@ -37,10 +42,14 @@ struct PingoIncomingMatchView: View {
                     Spacer()
                 }
                 statusCard
-                if hasPlayableWave3Game,
+                if hasPlayableGame,
                    localIsPlayer,
                    payload.match.status == .active || payload.match.status == .completed {
-                    PingoBoardGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves)
+                    if isPhysicsGame {
+                        PingoPhysicsGameView(match: payload.match, localProfile: localProfile, onMove: onPhysicsMove)
+                    } else {
+                        PingoBoardGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves)
+                    }
                 }
                 playerList
                 actions
@@ -137,19 +146,18 @@ struct PingoIncomingMatchView: View {
     }
 
     private var turnText: String {
-        guard hasPlayableWave3Game else { return "This game's engine arrives in a later wave." }
+        guard hasPlayableGame else { return "This game's engine arrives in a later wave." }
         if payload.match.currentPlayerID == localProfile.id {
             if payload.match.gameID == .seaBattle,
                let state = try? PingoBoardGameEngine.seaBattleState(from: payload.match.gameState),
                let index = payload.match.players.firstIndex(where: { $0.id == localProfile.id }) {
                 let ready = state.fleetReady.indices.contains(index) && state.fleetReady[index]
-                if !ready {
-                    return "Place your fleet, then lock it in and send the setup."
-                }
+                if !ready { return "Place your fleet, then lock it in and send the setup." }
                 if let pending = state.pendingShot, pending.shooter != index {
                     return "Resolve their shot and choose your return shot; Pingo sends both in one updated card."
                 }
             }
+            if isPhysicsGame { return "Set your aim and power, simulate the shot, then send the updated Pingo card." }
             return "Make your move, then send the updated Pingo card."
         }
         return "Open the newest Pingo card when your opponent sends their move."

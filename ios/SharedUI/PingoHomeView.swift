@@ -52,7 +52,7 @@ struct PingoHomeView: View {
     }
 
     private var footer: some View {
-        Text("5 playable games • 10-game launch catalog • iMessage challenges")
+        Text("10 playable launch games • board, strategy & physics • iMessage challenges")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -64,7 +64,7 @@ private struct GameTile: View {
     let game: PingoGameDescriptor
 
     private var isPlayable: Bool {
-        PingoBoardGameEngine.supportedGames.contains(game.id)
+        PingoPlayableGameRegistry.supportedGames.contains(game.id)
     }
 
     var body: some View {
@@ -104,7 +104,7 @@ private struct ChallengeGameView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var isPlayable: Bool {
-        PingoBoardGameEngine.supportedGames.contains(game.id)
+        PingoPlayableGameRegistry.supportedGames.contains(game.id)
     }
 
     var body: some View {
@@ -115,7 +115,7 @@ private struct ChallengeGameView: View {
                 .font(.title.bold())
             Text(isPlayable
                  ? "Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept, play, and send turns back."
-                 : "This game is already in Pingo's launch catalog, but its full gameplay engine arrives in the next build wave.")
+                 : "This game is already in Pingo's catalog, but its gameplay engine is not enabled in this build.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)

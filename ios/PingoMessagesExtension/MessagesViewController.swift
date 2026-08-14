@@ -27,6 +27,9 @@ final class MessagesViewController: MSMessagesAppViewController {
             onMoves: { [weak self] moves in
                 self?.submitGameMoves(moves)
             },
+            onPhysicsMove: { [weak self] move in
+                self?.submitPhysicsMove(move)
+            },
             onResign: { [weak self] in
                 self?.resignSelectedMatch()
             }
@@ -86,6 +89,10 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("Open Pingo inside an iMessage conversation first.")
             return
         }
+        guard PingoPlayableGameRegistry.supportedGames.contains(gameID) else {
+            model.setStatus("That Pingo game is not playable in this build.")
+            return
+        }
 
         do {
             let match = PingoMatchReducer.challenge(gameID: gameID, creator: model.profile)
@@ -109,11 +116,29 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
 
         do {
-            let match = try PingoMatchReducer.accept(
+            var match = try PingoMatchReducer.accept(
                 payload.match,
                 opponent: model.profile,
                 expectedRevision: payload.match.revision
             )
+            if match.gameState.isEmpty, PingoPhysicsGameEngine.supportedGames.contains(match.gameID) {
+                let initial = PingoPhysicsGameEngine.initialStateData(for: match.gameID)
+                match = PingoMatchEnvelope(
+                    id: match.id,
+                    gameID: match.gameID,
+                    status: match.status,
+                    createdAt: match.createdAt,
+                    updatedAt: match.updatedAt,
+                    expiresAt: match.expiresAt,
+                    revision: match.revision,
+                    turnNumber: match.turnNumber,
+                    createdByPlayerID: match.createdByPlayerID,
+                    currentPlayerID: match.currentPlayerID,
+                    winnerPlayerID: match.winnerPlayerID,
+                    players: match.players,
+                    gameState: initial
+                )
+            }
             let accepted = PingoMessagePayload(action: .accepted, sender: model.profile, match: match)
             let session = conversation.selectedMessage?.session ?? MSSession()
             let message = try PingoMessageFactory.make(payload: accepted, session: session)
@@ -150,13 +175,7 @@ final class MessagesViewController: MSMessagesAppViewController {
                 )
                 if match.status != .active { break }
             }
-            let action: PingoMessageAction = match.status == .completed ? .completed : .turn
-            let updated = PingoMessagePayload(action: action, sender: model.profile, match: match)
-            let session = conversation.selectedMessage?.session ?? MSSession()
-            let message = try PingoMessageFactory.make(payload: updated, session: session)
-            conversation.insert(message)
-            model.incomingPayload = updated
-            model.setStatus(match.status == .completed ? "Result added to the message box — tap Send." : "Move added to the message box — tap Send.")
+            try insertUpdatedMatch(match, conversation: conversation)
         } catch PingoMatchTransitionError.staleRevision {
             model.setStatus("That match changed. Open the newest Pingo message and try again.")
         } catch PingoMatchTransitionError.notActorsTurn {
@@ -172,6 +191,46 @@ final class MessagesViewController: MSMessagesAppViewController {
         } catch {
             model.setStatus("Pingo could not apply that move.")
         }
+    }
+
+    private func submitPhysicsMove(_ move: PingoPhysicsMove) {
+        guard let conversation = activeConversation,
+              let payload = model.incomingPayload,
+              payload.match.status == .active,
+              payload.match.currentPlayerID == model.profile.id,
+              PingoPhysicsGameEngine.supportedGames.contains(payload.match.gameID)
+        else {
+            model.setStatus("It is not your turn in this match.")
+            return
+        }
+
+        do {
+            let match = try PingoPhysicsGameEngine.submit(
+                move: move,
+                to: payload.match,
+                actorID: model.profile.id,
+                expectedRevision: payload.match.revision
+            )
+            try insertUpdatedMatch(match, conversation: conversation)
+        } catch PingoMatchTransitionError.staleRevision {
+            model.setStatus("That match changed. Open the newest Pingo message and try again.")
+        } catch PingoMatchTransitionError.notActorsTurn {
+            model.setStatus("It is not your turn yet.")
+        } catch PingoGameRuleError.invalidMove {
+            model.setStatus("Adjust the shot and try again.")
+        } catch {
+            model.setStatus("Pingo could not simulate that shot.")
+        }
+    }
+
+    private func insertUpdatedMatch(_ match: PingoMatchEnvelope, conversation: MSConversation) throws {
+        let action: PingoMessageAction = match.status == .completed ? .completed : .turn
+        let updated = PingoMessagePayload(action: action, sender: model.profile, match: match)
+        let session = conversation.selectedMessage?.session ?? MSSession()
+        let message = try PingoMessageFactory.make(payload: updated, session: session)
+        conversation.insert(message)
+        model.incomingPayload = updated
+        model.setStatus(match.status == .completed ? "Result added to the message box — tap Send." : "Move added to the message box — tap Send.")
     }
 
     private func resignSelectedMatch() {
