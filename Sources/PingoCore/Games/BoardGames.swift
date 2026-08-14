@@ -243,10 +243,15 @@ public struct PingoSeaBattleState: Hashable, Codable, Sendable {
 public enum PingoSeaBattle {
     public static func place(ship: PingoSeaBattleShip, start: PingoGridPoint, orientation: PingoSeaBattleOrientation, player: Int, in state: PingoSeaBattleState) throws -> PingoSeaBattleState {
         guard (0..<10).contains(start.row), (0..<10).contains(start.column) else { throw PingoGameRuleError.outOfBounds }
+        switch orientation {
+        case .horizontal:
+            guard start.column + ship.length <= 10 else { throw PingoGameRuleError.outOfBounds }
+        case .vertical:
+            guard start.row + ship.length <= 10 else { throw PingoGameRuleError.outOfBounds }
+        }
         var next = state
         guard !next.placements[player].contains(where: { $0.ship == ship }) else { throw PingoGameRuleError.shipAlreadyPlaced }
         let placement = PingoSeaBattlePlacement(ship: ship, start: start, orientation: orientation)
-        guard placement.cells.allSatisfy({ (0..<100).contains($0) && $0 / 10 < 10 && $0 % 10 < 10 }) else { throw PingoGameRuleError.outOfBounds }
         let existing = next.occupiedCells(player: player)
         guard Set(placement.cells).isDisjoint(with: existing) else { throw PingoGameRuleError.shipsOverlap }
         next.placements[player].append(placement)
