@@ -27,12 +27,31 @@ public enum PingoSeaBattleShip: String, Codable, CaseIterable, Sendable {
 
 public enum PingoSeaBattleOrientation: String, Codable, CaseIterable, Sendable { case horizontal, vertical }
 
+public struct PingoSeaBattlePlacement: Hashable, Codable, Sendable {
+    public let ship: PingoSeaBattleShip
+    public let start: PingoGridPoint
+    public let orientation: PingoSeaBattleOrientation
+    public init(ship: PingoSeaBattleShip, start: PingoGridPoint, orientation: PingoSeaBattleOrientation) {
+        self.ship = ship
+        self.start = start
+        self.orientation = orientation
+    }
+    public var cells: [Int] {
+        (0..<ship.length).map { offset in
+            let row = start.row + (orientation == .vertical ? offset : 0)
+            let column = start.column + (orientation == .horizontal ? offset : 0)
+            return row * 10 + column
+        }
+    }
+}
+
 public enum PingoGameMove: Hashable, Codable, Sendable {
     case ticTacToe(PingoGridPoint)
     case connectFour(column: Int)
     case checkers(from: PingoGridPoint, to: PingoGridPoint)
     case chess(from: PingoGridPoint, to: PingoGridPoint, promotion: PingoChessPromotion?)
-    case seaBattlePlace(ship: PingoSeaBattleShip, start: PingoGridPoint, orientation: PingoSeaBattleOrientation)
+    case seaBattleLockFleet([PingoSeaBattlePlacement])
+    case seaBattleResolvePending([PingoSeaBattlePlacement])
     case seaBattleFire(PingoGridPoint)
 }
 
@@ -48,6 +67,8 @@ public enum PingoGameRuleError: Error, Equatable, Sendable {
     case shipsOverlap
     case fleetNotReady
     case alreadyTargeted
+    case pendingShotRequired
+    case pendingShotExists
 }
 
 public struct PingoTicTacToeState: Hashable, Codable, Sendable {
@@ -218,30 +239,55 @@ public enum PingoCheckers {
     }
 }
 
-public struct PingoSeaBattlePlacement: Hashable, Codable, Sendable {
-    public let ship: PingoSeaBattleShip
-    public let start: PingoGridPoint
-    public let orientation: PingoSeaBattleOrientation
-    public init(ship: PingoSeaBattleShip, start: PingoGridPoint, orientation: PingoSeaBattleOrientation) { self.ship = ship; self.start = start; self.orientation = orientation }
-    public var cells: [Int] {
-        (0..<ship.length).map { offset in
-            let row = start.row + (orientation == .vertical ? offset : 0)
-            let col = start.column + (orientation == .horizontal ? offset : 0)
-            return row * 10 + col
-        }
+public struct PingoSeaBattleShot: Hashable, Codable, Sendable {
+    public let cell: Int
+    public let hit: Bool
+    public let sunk: PingoSeaBattleShip?
+    public init(cell: Int, hit: Bool, sunk: PingoSeaBattleShip? = nil) {
+        self.cell = cell
+        self.hit = hit
+        self.sunk = sunk
+    }
+}
+
+public struct PingoSeaBattlePendingShot: Hashable, Codable, Sendable {
+    public let shooter: Int
+    public let cell: Int
+    public init(shooter: Int, cell: Int) {
+        self.shooter = shooter
+        self.cell = cell
     }
 }
 
 public struct PingoSeaBattleState: Hashable, Codable, Sendable {
-    public var placements: [[PingoSeaBattlePlacement]]
-    public var shots: [[Int]]
-    public init(placements: [[PingoSeaBattlePlacement]] = [[],[]], shots: [[Int]] = [[],[]]) { self.placements = placements; self.shots = shots }
-    public func fleetReady(player: Int) -> Bool { Set(placements[player].map(\.ship)) == Set(PingoSeaBattleShip.allCases) }
-    public func occupiedCells(player: Int) -> Set<Int> { Set(placements[player].flatMap(\.cells)) }
+    public var fleetReady: [Bool]
+    public var shots: [[PingoSeaBattleShot]]
+    public var pendingShot: PingoSeaBattlePendingShot?
+
+    public init(
+        fleetReady: [Bool] = [false, false],
+        shots: [[PingoSeaBattleShot]] = [[], []],
+        pendingShot: PingoSeaBattlePendingShot? = nil
+    ) {
+        self.fleetReady = fleetReady
+        self.shots = shots
+        self.pendingShot = pendingShot
+    }
+
+    public func targetedCells(player: Int) -> Set<Int> {
+        var cells = Set(shots[player].map(\.cell))
+        if pendingShot?.shooter == player, let cell = pendingShot?.cell { cells.insert(cell) }
+        return cells
+    }
 }
 
 public enum PingoSeaBattle {
-    public static func place(ship: PingoSeaBattleShip, start: PingoGridPoint, orientation: PingoSeaBattleOrientation, player: Int, in state: PingoSeaBattleState) throws -> PingoSeaBattleState {
+    public static func addPlacement(
+        ship: PingoSeaBattleShip,
+        start: PingoGridPoint,
+        orientation: PingoSeaBattleOrientation,
+        to placements: [PingoSeaBattlePlacement]
+    ) throws -> [PingoSeaBattlePlacement] {
         guard (0..<10).contains(start.row), (0..<10).contains(start.column) else { throw PingoGameRuleError.outOfBounds }
         switch orientation {
         case .horizontal:
@@ -249,28 +295,70 @@ public enum PingoSeaBattle {
         case .vertical:
             guard start.row + ship.length <= 10 else { throw PingoGameRuleError.outOfBounds }
         }
-        var next = state
-        guard !next.placements[player].contains(where: { $0.ship == ship }) else { throw PingoGameRuleError.shipAlreadyPlaced }
+        guard !placements.contains(where: { $0.ship == ship }) else { throw PingoGameRuleError.shipAlreadyPlaced }
         let placement = PingoSeaBattlePlacement(ship: ship, start: start, orientation: orientation)
-        let existing = next.occupiedCells(player: player)
-        guard Set(placement.cells).isDisjoint(with: existing) else { throw PingoGameRuleError.shipsOverlap }
-        next.placements[player].append(placement)
+        let occupied = Set(placements.flatMap(\.cells))
+        guard Set(placement.cells).isDisjoint(with: occupied) else { throw PingoGameRuleError.shipsOverlap }
+        return placements + [placement]
+    }
+
+    public static func validateFleet(_ placements: [PingoSeaBattlePlacement]) throws {
+        guard Set(placements.map(\.ship)) == Set(PingoSeaBattleShip.allCases), placements.count == PingoSeaBattleShip.allCases.count else {
+            throw PingoGameRuleError.fleetNotReady
+        }
+        var rebuilt: [PingoSeaBattlePlacement] = []
+        for placement in placements {
+            rebuilt = try addPlacement(
+                ship: placement.ship,
+                start: placement.start,
+                orientation: placement.orientation,
+                to: rebuilt
+            )
+        }
+    }
+
+    public static func lockFleet(player: Int, placements: [PingoSeaBattlePlacement], in state: PingoSeaBattleState) throws -> PingoSeaBattleState {
+        try validateFleet(placements)
+        guard state.fleetReady.indices.contains(player), !state.fleetReady[player] else { throw PingoGameRuleError.invalidMove }
+        var next = state
+        next.fleetReady[player] = true
         return next
     }
 
-    public static func fire(at point: PingoGridPoint, player: Int, in state: PingoSeaBattleState) throws -> (PingoSeaBattleState, hit: Bool, sunk: PingoSeaBattleShip?, winner: Int?) {
+    public static func fire(at point: PingoGridPoint, player: Int, in state: PingoSeaBattleState) throws -> PingoSeaBattleState {
         guard (0..<10).contains(point.row), (0..<10).contains(point.column) else { throw PingoGameRuleError.outOfBounds }
-        guard state.fleetReady(player: 0), state.fleetReady(player: 1) else { throw PingoGameRuleError.fleetNotReady }
-        var next = state
+        guard state.fleetReady == [true, true] else { throw PingoGameRuleError.fleetNotReady }
+        guard state.pendingShot == nil else { throw PingoGameRuleError.pendingShotExists }
         let cell = point.index10
-        guard !next.shots[player].contains(cell) else { throw PingoGameRuleError.alreadyTargeted }
-        next.shots[player].append(cell)
-        let opponent = 1 - player
-        let occupied = next.occupiedCells(player: opponent)
-        let hit = occupied.contains(cell)
-        let fired = Set(next.shots[player])
-        let sunk = next.placements[opponent].first(where: { Set($0.cells).isSubset(of: fired) && $0.cells.contains(cell) })?.ship
-        let winner = occupied.isSubset(of: fired) ? player : nil
-        return (next, hit, sunk, winner)
+        guard !state.targetedCells(player: player).contains(cell) else { throw PingoGameRuleError.alreadyTargeted }
+        var next = state
+        next.pendingShot = .init(shooter: player, cell: cell)
+        return next
+    }
+
+    public static func resolvePending(
+        defender: Int,
+        fleet: [PingoSeaBattlePlacement],
+        in state: PingoSeaBattleState
+    ) throws -> (PingoSeaBattleState, result: PingoSeaBattleShot, winner: Int?) {
+        try validateFleet(fleet)
+        guard let pending = state.pendingShot else { throw PingoGameRuleError.pendingShotRequired }
+        guard pending.shooter != defender, state.fleetReady.indices.contains(defender), state.fleetReady[defender] else {
+            throw PingoGameRuleError.invalidMove
+        }
+        let shooter = pending.shooter
+        let occupied = Set(fleet.flatMap(\.cells))
+        let prior = Set(state.shots[shooter].map(\.cell))
+        let fired = prior.union([pending.cell])
+        let hit = occupied.contains(pending.cell)
+        let sunk = hit
+            ? fleet.first(where: { $0.cells.contains(pending.cell) && Set($0.cells).isSubset(of: fired) })?.ship
+            : nil
+        let winner = occupied.isSubset(of: fired) ? shooter : nil
+        let result = PingoSeaBattleShot(cell: pending.cell, hit: hit, sunk: sunk)
+        var next = state
+        next.shots[shooter].append(result)
+        next.pendingShot = nil
+        return (next, result, winner)
     }
 }
