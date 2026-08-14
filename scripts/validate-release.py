@@ -47,12 +47,17 @@ require(isinstance(privacy.get("NSPrivacyCollectedDataTypes"), list), "privacy d
 collected = {entry.get("NSPrivacyCollectedDataType") for entry in privacy["NSPrivacyCollectedDataTypes"]}
 expected_collected = {
     "NSPrivacyCollectedDataTypeUserID",
-    "NSPrivacyCollectedDataTypeOtherUserContent",
+    "NSPrivacyCollectedDataTypeGameplayContent",
     "NSPrivacyCollectedDataTypeProductInteraction",
 }
 require(expected_collected.issubset(collected), "privacy manifest no longer describes Pingo's backend data model")
 for entry in privacy["NSPrivacyCollectedDataTypes"]:
     require(entry.get("NSPrivacyCollectedDataTypeTracking") is False, "collected data must not be marked as tracking")
+    require(entry.get("NSPrivacyCollectedDataTypeLinked") is True, "Pingo release data is linked to the player identity")
+    require(
+        "NSPrivacyCollectedDataTypePurposeAppFunctionality" in entry.get("NSPrivacyCollectedDataTypePurposes", []),
+        "collected data must remain limited to app functionality unless the privacy review is updated",
+    )
 
 source = read("Sources/PingoCore/Progression/PingoSeriesStore.swift")
 source_product_ids = set(re.findall(r'case\s+\w+\s*=\s*"(com\.pingo\.[^"]+)"', source))
@@ -92,6 +97,7 @@ required_release_files = [
     "release/app-store/REVIEW-NOTES.md",
     "release/app-store/TESTFLIGHT-NOTES.md",
     "release/app-store/required-values.env.example",
+    "docs/architecture/WAVE-7.md",
     "docs/PRIVACY.md",
     "docs/SUPPORT.md",
     ".github/workflows/app-store-release.yml",
@@ -111,7 +117,7 @@ for path in tracked:
     require("secrets.xcconfig" not in lower, f"secret Xcode configuration must never be committed: {path}")
 
 print("Wave 7 release readiness validation passed")
-print(f"- marketing version: 1.0.0")
+print("- marketing version: 1.0.0")
 print(f"- StoreKit products: {len(source_product_ids)}")
 print(f"- privacy data types: {len(collected)}")
 print("- tracked signing secrets: none")
