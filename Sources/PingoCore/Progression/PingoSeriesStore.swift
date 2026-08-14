@@ -63,9 +63,7 @@ public struct PingoSeriesState: Hashable, Codable, Sendable {
                 next.winnerPlayerIndex = winnerIndex
             }
         }
-        if !next.completed {
-            next.gameNumber += 1
-        }
+        if !next.completed { next.gameNumber += 1 }
         return next
     }
 
@@ -142,6 +140,9 @@ public enum PingoAchievementID: String, Codable, CaseIterable, Sendable {
 
 public enum PingoEntitlementID: String, Codable, CaseIterable, Sendable {
     case premiumGames = "premium_games"
+    case arcadeExpansion = "games_arcade_expansion"
+    case wordPartyExpansion = "games_word_party_expansion"
+    case classicsExpansion = "games_classics_expansion"
     case neonCosmetics = "cosmetics_neon"
     case spaceCosmetics = "cosmetics_space"
     case classicCosmetics = "cosmetics_classic"
@@ -149,6 +150,9 @@ public enum PingoEntitlementID: String, Codable, CaseIterable, Sendable {
 
 public enum PingoStoreProduct: String, Codable, CaseIterable, Sendable {
     case premiumGames = "com.pingo.premiumgames"
+    case arcadeExpansion = "com.pingo.games.arcade"
+    case wordPartyExpansion = "com.pingo.games.wordparty"
+    case classicsExpansion = "com.pingo.games.classics"
     case neonCosmetics = "com.pingo.cosmetics.neon"
     case spaceCosmetics = "com.pingo.cosmetics.space"
     case classicCosmetics = "com.pingo.cosmetics.classic"
@@ -156,6 +160,9 @@ public enum PingoStoreProduct: String, Codable, CaseIterable, Sendable {
     public var entitlement: PingoEntitlementID {
         switch self {
         case .premiumGames: .premiumGames
+        case .arcadeExpansion: .arcadeExpansion
+        case .wordPartyExpansion: .wordPartyExpansion
+        case .classicsExpansion: .classicsExpansion
         case .neonCosmetics: .neonCosmetics
         case .spaceCosmetics: .spaceCosmetics
         case .classicCosmetics: .classicCosmetics
@@ -202,15 +209,12 @@ public enum PingoCosmeticCatalog {
         .init(id: "golf.classic", name: "Classic Ball", symbol: "⚪️", slot: .golfBall),
         .init(id: "cup.classic", name: "Classic Cups", symbol: "🥤", slot: .cup),
         .init(id: "basketball.classic", name: "Classic Ball", symbol: "🏀", slot: .basketball),
-
         .init(id: "theme.neon", name: "Neon Arena", symbol: "🌈", slot: .theme, entitlement: .neonCosmetics),
         .init(id: "cue.neon", name: "Neon Cue", symbol: "💫", slot: .cue, entitlement: .neonCosmetics),
         .init(id: "darts.neon", name: "Neon Darts", symbol: "⚡️", slot: .darts, entitlement: .neonCosmetics),
-
         .init(id: "theme.space", name: "Deep Space", symbol: "🌌", slot: .theme, entitlement: .spaceCosmetics),
         .init(id: "golf.space", name: "Moon Ball", symbol: "🌕", slot: .golfBall, entitlement: .spaceCosmetics),
         .init(id: "basketball.space", name: "Orbit Ball", symbol: "🪐", slot: .basketball, entitlement: .spaceCosmetics),
-
         .init(id: "avatar.crown", name: "Crown", symbol: "👑", slot: .avatar, entitlement: .classicCosmetics),
         .init(id: "cup.gold", name: "Gold Cups", symbol: "🏆", slot: .cup, entitlement: .classicCosmetics),
         .init(id: "cue.gold", name: "Gold Cue", symbol: "✨", slot: .cue, entitlement: .classicCosmetics)
@@ -236,10 +240,44 @@ public enum PingoAccessPolicy {
         .eightBall, .cupPong, .basketball, .darts, .ticTacToe
     ]
 
-    public static let premiumGames: Set<PingoGameID> = Set(PingoGameID.allCases).subtracting(freeGames)
+    public static let premiumGames: Set<PingoGameID> = [
+        .miniGolf, .seaBattle, .chess, .checkers, .connectFour
+    ]
+
+    public static let arcadeExpansionGames: Set<PingoGameID> = [
+        .bowling, .penaltyShootout, .archery, .airHockey, .miniRacing, .reactionBattle
+    ]
+
+    public static let wordPartyExpansionGames: Set<PingoGameID> = [
+        .drawAndGuess, .wordHunt, .anagrams, .trivia
+    ]
+
+    public static let classicsExpansionGames: Set<PingoGameID> = [
+        .crazyEights, .ludo
+    ]
+
+    public static func requiredEntitlement(for gameID: PingoGameID) -> PingoEntitlementID? {
+        if freeGames.contains(gameID) { return nil }
+        if premiumGames.contains(gameID) { return .premiumGames }
+        if arcadeExpansionGames.contains(gameID) { return .arcadeExpansion }
+        if wordPartyExpansionGames.contains(gameID) { return .wordPartyExpansion }
+        if classicsExpansionGames.contains(gameID) { return .classicsExpansion }
+        return nil
+    }
+
+    public static func packTitle(for gameID: PingoGameID) -> String? {
+        switch requiredEntitlement(for: gameID) {
+        case .premiumGames: "Premium Game Pack"
+        case .arcadeExpansion: "Arcade Expansion"
+        case .wordPartyExpansion: "Word & Party Expansion"
+        case .classicsExpansion: "Classics Expansion"
+        default: nil
+        }
+    }
 
     public static func canPlay(_ gameID: PingoGameID, entitlements: Set<PingoEntitlementID>) -> Bool {
-        freeGames.contains(gameID) || entitlements.contains(.premiumGames)
+        guard let required = requiredEntitlement(for: gameID) else { return freeGames.contains(gameID) }
+        return entitlements.contains(required)
     }
 
     public static func accessibleGames(entitlements: Set<PingoEntitlementID>) -> [PingoGameID] {
@@ -255,4 +293,3 @@ public enum PingoRandomGame {
         return available[Int(mixed % UInt64(available.count))]
     }
 }
-

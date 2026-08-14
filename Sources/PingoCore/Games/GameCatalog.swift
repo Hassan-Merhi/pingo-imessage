@@ -11,8 +11,23 @@ public enum PingoGameCatalog {
         .init(id: .chess, name: "Chess", symbol: "♟️", family: .board, isFreeAtLaunch: false),
         .init(id: .checkers, name: "Checkers", symbol: "🔴", family: .board, isFreeAtLaunch: false),
         .init(id: .connectFour, name: "Connect Four", symbol: "🔵", family: .board, isFreeAtLaunch: false),
-        .init(id: .ticTacToe, name: "Tic-Tac-Toe", symbol: "❌", family: .board)
+        .init(id: .ticTacToe, name: "Tic-Tac-Toe", symbol: "❌", family: .board),
+
+        .init(id: .bowling, name: "Bowling", symbol: "🎳", family: .arcade, isFreeAtLaunch: false),
+        .init(id: .penaltyShootout, name: "Penalty Shootout", symbol: "⚽️", family: .arcade, isFreeAtLaunch: false),
+        .init(id: .archery, name: "Archery", symbol: "🏹", family: .precision, isFreeAtLaunch: false),
+        .init(id: .airHockey, name: "Air Hockey", symbol: "🏒", family: .arcade, isFreeAtLaunch: false),
+        .init(id: .drawAndGuess, name: "Draw & Guess", symbol: "🎨", family: .party, isFreeAtLaunch: false),
+        .init(id: .wordHunt, name: "Word Hunt", symbol: "🔤", family: .word, isFreeAtLaunch: false),
+        .init(id: .anagrams, name: "Anagrams", symbol: "🔀", family: .word, isFreeAtLaunch: false),
+        .init(id: .trivia, name: "Trivia", symbol: "🧠", family: .party, isFreeAtLaunch: false),
+        .init(id: .crazyEights, name: "Crazy Eights", symbol: "🃏", family: .cards, isFreeAtLaunch: false),
+        .init(id: .ludo, name: "Ludo", symbol: "🎲", family: .board, isFreeAtLaunch: false),
+        .init(id: .miniRacing, name: "Mini Racing", symbol: "🏎️", family: .racing, isFreeAtLaunch: false),
+        .init(id: .reactionBattle, name: "Reaction Battle", symbol: "⚡️", family: .arcade, isFreeAtLaunch: false)
     ]
+
+    public static let wave6: [PingoGameDescriptor] = Array(launch.dropFirst(10))
 
     public static func game(id: PingoGameID) -> PingoGameDescriptor? {
         launch.first { $0.id == id }

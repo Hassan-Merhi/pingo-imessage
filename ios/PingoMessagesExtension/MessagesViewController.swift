@@ -22,6 +22,7 @@ final class MessagesViewController: MSMessagesAppViewController {
             onAccept: { [weak self] in self?.acceptSelectedChallenge() },
             onMoves: { [weak self] moves in self?.submitGameMoves(moves) },
             onPhysicsMove: { [weak self] move in self?.submitPhysicsMove(move) },
+            onExtraMove: { [weak self] move in self?.submitExtraMove(move) },
             onContinueSeries: { [weak self] in self?.continueSelectedSeries() },
             onResign: { [weak self] in self?.resignSelectedMatch() }
         )
@@ -81,13 +82,13 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("Open Pingo inside an iMessage conversation first.")
             return
         }
-        guard PingoPlayableGameRegistry.supportedGames.contains(gameID) else {
+        guard isSupportedGame(gameID) else {
             model.setStatus("That Pingo game is not playable in this build.")
             return
         }
         guard model.canPlay(gameID) else {
             model.showStore()
-            model.setStatus("Unlock the Premium Game Pack to challenge someone to that game.")
+            model.setStatus(lockedPackMessage(for: gameID, action: "challenge someone to that game"))
             return
         }
 
@@ -115,9 +116,13 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("This challenge cannot be accepted.")
             return
         }
+        guard isSupportedGame(payload.match.gameID) else {
+            model.setStatus("That Pingo game is not playable in this build.")
+            return
+        }
         guard model.canPlay(payload.match.gameID) else {
             model.showStore()
-            model.setStatus("Unlock the Premium Game Pack to accept this challenge.")
+            model.setStatus(lockedPackMessage(for: payload.match.gameID, action: "accept this challenge"))
             return
         }
 
@@ -127,25 +132,15 @@ final class MessagesViewController: MSMessagesAppViewController {
                 opponent: model.profile,
                 expectedRevision: payload.match.revision
             )
+            // Legacy physics challenges from pre-Wave-6 cards may still arrive without state.
             if match.gameState.isEmpty, PingoPhysicsGameEngine.supportedGames.contains(match.gameID) {
                 let initial = PingoPhysicsGameEngine.initialStateData(for: match.gameID)
-                match = PingoMatchEnvelope(
-                    id: match.id,
-                    schemaVersion: match.schemaVersion,
-                    gameID: match.gameID,
-                    status: match.status,
-                    createdAt: match.createdAt,
-                    updatedAt: match.updatedAt,
-                    expiresAt: match.expiresAt,
-                    revision: match.revision,
-                    turnNumber: match.turnNumber,
-                    createdByPlayerID: match.createdByPlayerID,
-                    currentPlayerID: match.currentPlayerID,
-                    winnerPlayerID: match.winnerPlayerID,
-                    players: match.players,
-                    gameState: initial,
-                    series: match.series
-                )
+                match = replacingGameState(in: match, with: initial)
+            }
+            // Defensive support for early Wave-6 challenge cards created before reducer initialization.
+            if match.gameState.isEmpty, PingoExtraGameEngine.supportedGames.contains(match.gameID) {
+                let initial = PingoExtraGameEngine.initialStateData(for: match.gameID, matchID: match.id)
+                match = replacingGameState(in: match, with: initial)
             }
             let accepted = PingoMessagePayload(action: .accepted, sender: model.profile, match: match)
             let session = conversation.selectedMessage?.session ?? MSSession()
@@ -169,7 +164,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
         guard model.canPlay(payload.match.gameID) else {
             model.showStore()
-            model.setStatus("Unlock the Premium Game Pack to continue this match.")
+            model.setStatus(lockedPackMessage(for: payload.match.gameID, action: "continue this match"))
             return
         }
 
@@ -216,7 +211,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
         guard model.canPlay(payload.match.gameID) else {
             model.showStore()
-            model.setStatus("Unlock the Premium Game Pack to continue this match.")
+            model.setStatus(lockedPackMessage(for: payload.match.gameID, action: "continue this match"))
             return
         }
 
@@ -239,10 +234,44 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
     }
 
+    private func submitExtraMove(_ move: PingoExtraGameMove) {
+        guard let conversation = activeConversation,
+              let payload = model.incomingPayload,
+              payload.match.status == .active,
+              payload.match.currentPlayerID == model.profile.id,
+              PingoExtraGameEngine.supportedGames.contains(payload.match.gameID) else {
+            model.setStatus("It is not your turn in this match.")
+            return
+        }
+        guard model.canPlay(payload.match.gameID) else {
+            model.showStore()
+            model.setStatus(lockedPackMessage(for: payload.match.gameID, action: "continue this match"))
+            return
+        }
+
+        do {
+            let match = try PingoExtraGameEngine.submit(
+                move: move,
+                to: payload.match,
+                actorID: model.profile.id,
+                expectedRevision: payload.match.revision
+            )
+            try insertUpdatedMatch(match, conversation: conversation)
+        } catch PingoMatchTransitionError.staleRevision {
+            model.setStatus("That match changed. Open the newest Pingo message and try again.")
+        } catch PingoMatchTransitionError.notActorsTurn {
+            model.setStatus("It is not your turn yet.")
+        } catch PingoGameRuleError.invalidMove {
+            model.setStatus("That move is not legal. Adjust it and try again.")
+        } catch {
+            model.setStatus("Pingo could not apply that move.")
+        }
+    }
+
     private func continueSelectedSeries() {
         guard let conversation = activeConversation,
               let payload = model.incomingPayload,
-              payload.match.status == .completed || payload.match.status == .resigned,
+              (payload.match.status == .completed || payload.match.status == .resigned),
               let series = payload.match.series,
               !series.completed else {
             model.setStatus("There is no unfinished series to continue.")
@@ -254,7 +283,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
         guard model.canPlay(payload.match.gameID) else {
             model.showStore()
-            model.setStatus("Unlock the Premium Game Pack to continue this series.")
+            model.setStatus(lockedPackMessage(for: payload.match.gameID, action: "continue this series"))
             return
         }
 
@@ -306,5 +335,34 @@ final class MessagesViewController: MSMessagesAppViewController {
         } catch {
             model.setStatus("Pingo could not resign this match.")
         }
+    }
+
+    private func isSupportedGame(_ gameID: PingoGameID) -> Bool {
+        PingoPlayableGameRegistry.supportedGames.contains(gameID) || PingoExtraGameEngine.supportedGames.contains(gameID)
+    }
+
+    private func lockedPackMessage(for gameID: PingoGameID, action: String) -> String {
+        let title = PingoAccessPolicy.packTitle(for: gameID) ?? "required game pack"
+        return "Unlock the \(title) to \(action)."
+    }
+
+    private func replacingGameState(in match: PingoMatchEnvelope, with gameState: Data) -> PingoMatchEnvelope {
+        PingoMatchEnvelope(
+            id: match.id,
+            schemaVersion: match.schemaVersion,
+            gameID: match.gameID,
+            status: match.status,
+            createdAt: match.createdAt,
+            updatedAt: match.updatedAt,
+            expiresAt: match.expiresAt,
+            revision: match.revision,
+            turnNumber: match.turnNumber,
+            createdByPlayerID: match.createdByPlayerID,
+            currentPlayerID: match.currentPlayerID,
+            winnerPlayerID: match.winnerPlayerID,
+            players: match.players,
+            gameState: gameState,
+            series: match.series
+        )
     }
 }

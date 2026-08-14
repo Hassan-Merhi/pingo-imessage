@@ -9,6 +9,7 @@ struct PingoMessagesRootView: View {
     let onAccept: () -> Void
     let onMoves: ([PingoGameMove]) -> Void
     let onPhysicsMove: (PingoPhysicsMove) -> Void
+    let onExtraMove: (PingoExtraGameMove) -> Void
     let onContinueSeries: () -> Void
     let onResign: () -> Void
 
@@ -27,6 +28,7 @@ struct PingoMessagesRootView: View {
                                 onAccept: onAccept,
                                 onMoves: onMoves,
                                 onPhysicsMove: onPhysicsMove,
+                                onExtraMove: onExtraMove,
                                 onContinueSeries: onContinueSeries,
                                 onResign: onResign,
                                 onOpenStore: model.showStore,

@@ -45,7 +45,7 @@ public enum PingoMatchReducer {
         }
 
         let players = match.players + [.init(id: opponent.id, displayName: opponent.username)]
-        let initialState = PingoBoardGameEngine.initialStateData(for: match.gameID)
+        let initialState = initialGameState(for: match.gameID, matchID: match.id)
         return PingoMatchEnvelope(
             id: match.id,
             gameID: match.gameID,
@@ -209,9 +209,10 @@ public enum PingoMatchReducer {
             currentPlayerID = canonicalPlayers[starterIndex].id
         }
 
-        let boardState = PingoBoardGameEngine.initialStateData(for: match.gameID)
-        let initialState = boardState.isEmpty ? PingoPhysicsGameEngine.initialStateData(for: match.gameID) : boardState
+        let newMatchID = UUID()
+        let initialState = initialGameState(for: match.gameID, matchID: newMatchID)
         return PingoMatchEnvelope(
+            id: newMatchID,
             gameID: match.gameID,
             status: .active,
             createdAt: now,
@@ -225,6 +226,16 @@ public enum PingoMatchReducer {
             gameState: initialState,
             series: series
         )
+    }
+
+    private static func initialGameState(for gameID: PingoGameID, matchID: UUID) -> Data {
+        let boardState = PingoBoardGameEngine.initialStateData(for: gameID)
+        if !boardState.isEmpty { return boardState }
+
+        let physicsState = PingoPhysicsGameEngine.initialStateData(for: gameID)
+        if !physicsState.isEmpty { return physicsState }
+
+        return PingoExtraGameEngine.initialStateData(for: gameID, matchID: matchID)
     }
 
     private static func seriesPlayerIndex(for playerID: UUID?, in match: PingoMatchEnvelope) -> Int? {

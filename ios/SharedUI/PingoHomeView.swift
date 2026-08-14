@@ -17,21 +17,13 @@ struct PingoHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 hero
                 quickPlay
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(PingoGameCatalog.launch) { game in
-                        let unlocked = PingoAccessPolicy.canPlay(game.id, entitlements: progression.entitlements)
-                        Button {
-                            if unlocked {
-                                selectedGame = game
-                            } else {
-                                onOpenStore()
-                            }
-                        } label: {
-                            GameTile(game: game, unlocked: unlocked)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                Text("Original Collection")
+                    .font(.headline)
+                gameGrid(Array(PingoGameCatalog.launch.prefix(10)))
+                Text("Wave 6 Expansions")
+                    .font(.headline)
+                    .padding(.top, 2)
+                gameGrid(PingoGameCatalog.wave6)
                 footer
             }
             .padding(16)
@@ -41,6 +33,25 @@ struct PingoHomeView: View {
             ChallengeGameView(game: game) { format in
                 onChallenge(game.id, format)
                 selectedGame = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gameGrid(_ games: [PingoGameDescriptor]) -> some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(games) { game in
+                let unlocked = PingoAccessPolicy.canPlay(game.id, entitlements: progression.entitlements)
+                Button {
+                    if unlocked {
+                        selectedGame = game
+                    } else {
+                        onOpenStore()
+                    }
+                } label: {
+                    GameTile(game: game, unlocked: unlocked)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -87,7 +98,7 @@ struct PingoHomeView: View {
     }
 
     private var footer: some View {
-        Text("5 free games • 5 Premium Pack games • Single, Best of 3 & Best of 5")
+        Text("22 games • 5 free • 4 one-time game packs • Single, Best of 3 & Best of 5")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -106,7 +117,7 @@ private struct GameTile: View {
                 Text(game.symbol)
                     .font(.system(size: 32))
                 Spacer()
-                Text(unlocked ? (game.isFreeAtLaunch ? "FREE" : "OWNED") : "PREMIUM")
+                Text(unlocked ? (game.isFreeAtLaunch ? "FREE" : "OWNED") : "PACK")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(unlocked ? Color.pingoPrimary : .secondary)
                     .padding(.horizontal, 7)
@@ -147,7 +158,7 @@ private struct ChallengeGameView: View {
                 .font(.system(size: 64))
             Text(game.name)
                 .font(.title.bold())
-            Text(game.isFreeAtLaunch ? "Free game" : "Premium Pack")
+            Text(PingoAccessPolicy.packTitle(for: game.id) ?? "Free game")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Color.pingoPrimary)
             Text("Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept, play, and send turns back.")

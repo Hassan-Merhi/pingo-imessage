@@ -8,6 +8,7 @@ struct PingoIncomingMatchView: View {
     let onAccept: () -> Void
     let onMoves: ([PingoGameMove]) -> Void
     let onPhysicsMove: (PingoPhysicsMove) -> Void
+    let onExtraMove: (PingoExtraGameMove) -> Void
     let onContinueSeries: () -> Void
     let onResign: () -> Void
     let onOpenStore: () -> Void
@@ -21,8 +22,12 @@ struct PingoIncomingMatchView: View {
         payload.match.players.contains(where: { $0.id == localProfile.id })
     }
 
+    private var isExtraGame: Bool {
+        PingoExtraGameEngine.supportedGames.contains(payload.match.gameID)
+    }
+
     private var hasPlayableGame: Bool {
-        PingoPlayableGameRegistry.supportedGames.contains(payload.match.gameID)
+        PingoPlayableGameRegistry.supportedGames.contains(payload.match.gameID) || isExtraGame
     }
 
     private var localCanPlay: Bool {
@@ -35,6 +40,10 @@ struct PingoIncomingMatchView: View {
 
     private var localIsSeriesHost: Bool {
         payload.match.createdByPlayerID == localProfile.id
+    }
+
+    private var requiredPackTitle: String {
+        PingoAccessPolicy.packTitle(for: payload.match.gameID) ?? "game pack"
     }
 
     var body: some View {
@@ -58,16 +67,7 @@ struct PingoIncomingMatchView: View {
                 }
                 statusCard
                 if payload.match.series != nil { seriesCard }
-                if hasPlayableGame,
-                   localCanPlay,
-                   localIsPlayer,
-                   payload.match.status == .active || payload.match.status == .completed {
-                    if isPhysicsGame {
-                        PingoPhysicsGameView(match: payload.match, localProfile: localProfile, onMove: onPhysicsMove)
-                    } else {
-                        PingoBoardGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves)
-                    }
-                }
+                gameContent
                 playerList
                 actions
                 Button("Back to games", action: onClose)
@@ -79,11 +79,27 @@ struct PingoIncomingMatchView: View {
     }
 
     @ViewBuilder
+    private var gameContent: some View {
+        if hasPlayableGame,
+           localCanPlay,
+           localIsPlayer,
+           payload.match.status == .active || payload.match.status == .completed {
+            if isExtraGame {
+                PingoExtraGameView(match: payload.match, localProfile: localProfile, onMove: onExtraMove)
+            } else if isPhysicsGame {
+                PingoPhysicsGameView(match: payload.match, localProfile: localProfile, onMove: onPhysicsMove)
+            } else {
+                PingoBoardGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var statusCard: some View {
         VStack(spacing: 6) {
             if !localCanPlay {
-                Text("Premium Game").font(.headline)
-                Text("Unlock the Premium Game Pack to accept or continue this match.")
+                Text("Game Pack Required").font(.headline)
+                Text("Unlock the \(requiredPackTitle) to accept or continue this match.")
                     .foregroundStyle(.secondary)
             } else {
                 switch payload.match.status {
@@ -130,25 +146,12 @@ struct PingoIncomingMatchView: View {
                     .foregroundStyle(.secondary)
             }
             HStack(spacing: 20) {
-                VStack(spacing: 2) {
-                    Text(payload.match.players.first?.displayName ?? "Player 1")
-                        .font(.caption)
-                        .lineLimit(1)
-                    Text("\(seriesScore(at: 0))")
-                        .font(.title2.bold())
-                }
+                seriesScoreColumn(player: seriesPlayer(at: 0), scoreIndex: 0)
                 Text("–").font(.headline).foregroundStyle(.secondary)
-                VStack(spacing: 2) {
-                    Text(payload.match.players.count > 1 ? payload.match.players[1].displayName : "Player 2")
-                        .font(.caption)
-                        .lineLimit(1)
-                    Text("\(seriesScore(at: 1))")
-                        .font(.title2.bold())
-                }
+                seriesScoreColumn(player: seriesPlayer(at: 1), scoreIndex: 1)
             }
-            if let series = payload.match.series, series.completed, let winnerIndex = series.winnerPlayerIndex,
-               payload.match.players.indices.contains(winnerIndex) {
-                Text("@\(payload.match.players[winnerIndex].displayName) won the series")
+            if let series = payload.match.series, series.completed, let winnerIndex = series.winnerPlayerIndex {
+                Text("@\(seriesPlayer(at: winnerIndex)?.displayName ?? "player") won the series")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.pingoPrimary)
             }
@@ -156,6 +159,26 @@ struct PingoIncomingMatchView: View {
         .frame(maxWidth: .infinity)
         .padding(16)
         .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func seriesScoreColumn(player: PingoPlayerRef?, scoreIndex: Int) -> some View {
+        VStack(spacing: 2) {
+            Text(player.map { "@\($0.displayName)" } ?? "Player")
+                .font(.caption)
+                .lineLimit(1)
+            Text("\(seriesScore(at: scoreIndex))")
+                .font(.title2.bold())
+        }
+    }
+
+    private func seriesPlayer(at index: Int) -> PingoPlayerRef? {
+        guard payload.match.players.count == 2 else {
+            return payload.match.players.indices.contains(index) ? payload.match.players[index] : nil
+        }
+        if index == 0 {
+            return payload.match.players.first(where: { $0.id == payload.match.createdByPlayerID })
+        }
+        return payload.match.players.first(where: { $0.id != payload.match.createdByPlayerID })
     }
 
     private var playerList: some View {
@@ -167,7 +190,9 @@ struct PingoIncomingMatchView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("@\(player.displayName)")
                         if payload.match.gameID == .chess {
-                            Text(index == 0 ? "White" : "Black").font(.caption2).foregroundStyle(.secondary)
+                            Text(index == 0 ? "White" : "Black")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
@@ -187,7 +212,7 @@ struct PingoIncomingMatchView: View {
     @ViewBuilder
     private var actions: some View {
         if !localCanPlay {
-            Button("Unlock Premium Game Pack", action: onOpenStore)
+            Button("Unlock \(requiredPackTitle)", action: onOpenStore)
                 .buttonStyle(.borderedProminent)
                 .tint(.pingoPrimary)
         } else if payload.match.status == .awaitingOpponent,
@@ -216,7 +241,6 @@ struct PingoIncomingMatchView: View {
         }
     }
 
-
     private func seriesScore(at index: Int) -> Int {
         guard let wins = payload.match.series?.wins, wins.indices.contains(index) else { return 0 }
         return wins[index]
@@ -234,13 +258,13 @@ struct PingoIncomingMatchView: View {
 
     private var seriesGameLabel: String {
         guard let series = payload.match.series else { return "Single Game" }
-        let game: Int
+        let gameNumber: Int
         if payload.match.status == .completed || payload.match.status == .resigned {
-            game = series.completed ? series.gameNumber : max(1, series.gameNumber - 1)
+            gameNumber = series.completed ? series.gameNumber : max(1, series.gameNumber - 1)
         } else {
-            game = series.gameNumber
+            gameNumber = series.gameNumber
         }
-        return "Game \(game)"
+        return "Game \(gameNumber)"
     }
 
     private var turnText: String {
@@ -255,6 +279,7 @@ struct PingoIncomingMatchView: View {
                     return "Resolve their shot and choose your return shot; Pingo sends both in one updated card."
                 }
             }
+            if isExtraGame { return "Make your move, then send the updated Pingo card." }
             if isPhysicsGame { return "Set your aim and power, simulate the shot, then send the updated Pingo card." }
             return "Make your move, then send the updated Pingo card."
         }
