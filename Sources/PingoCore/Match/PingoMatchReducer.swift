@@ -14,9 +14,11 @@ public enum PingoMatchReducer {
     public static func challenge(
         gameID: PingoGameID,
         creator: PingoPublicProfile,
+        seriesFormat: PingoSeriesFormat = .single,
         now: Date = Date()
     ) -> PingoMatchEnvelope {
-        PingoMatchEnvelope(
+        let series = seriesFormat == .single ? nil : PingoSeriesState(format: seriesFormat)
+        return PingoMatchEnvelope(
             gameID: gameID,
             status: .awaitingOpponent,
             createdAt: now,
@@ -24,7 +26,8 @@ public enum PingoMatchReducer {
             expiresAt: Calendar.current.date(byAdding: .day, value: 7, to: now),
             revision: 0,
             createdByPlayerID: creator.id,
-            players: [.init(id: creator.id, displayName: creator.username)]
+            players: [.init(id: creator.id, displayName: creator.username)],
+            series: series
         )
     }
 
@@ -55,7 +58,8 @@ public enum PingoMatchReducer {
             createdByPlayerID: match.createdByPlayerID,
             currentPlayerID: match.createdByPlayerID,
             players: players,
-            gameState: initialState.isEmpty ? match.gameState : initialState
+            gameState: initialState.isEmpty ? match.gameState : initialState,
+            series: match.series
         )
     }
 
@@ -89,7 +93,8 @@ public enum PingoMatchReducer {
             createdByPlayerID: match.createdByPlayerID,
             currentPlayerID: nextPlayerID,
             players: match.players,
-            gameState: gameState
+            gameState: gameState,
+            series: match.series
         )
     }
 
@@ -112,6 +117,8 @@ public enum PingoMatchReducer {
             throw PingoMatchTransitionError.invalidNextPlayer
         }
 
+        let winnerIndex = winnerPlayerID.flatMap { id in match.players.firstIndex(where: { $0.id == id }) }
+        let updatedSeries = match.series?.recording(winnerIndex: winnerIndex)
         return PingoMatchEnvelope(
             id: match.id,
             gameID: match.gameID,
@@ -125,7 +132,8 @@ public enum PingoMatchReducer {
             currentPlayerID: nil,
             winnerPlayerID: winnerPlayerID,
             players: match.players,
-            gameState: gameState
+            gameState: gameState,
+            series: updatedSeries
         )
     }
 
@@ -137,11 +145,13 @@ public enum PingoMatchReducer {
     ) throws -> PingoMatchEnvelope {
         guard match.revision == expectedRevision else { throw PingoMatchTransitionError.staleRevision }
         guard match.status == .active else { throw PingoMatchTransitionError.invalidStatus }
-        guard match.players.contains(where: { $0.id == actorID }) else {
+        guard let actorIndex = match.players.firstIndex(where: { $0.id == actorID }) else {
             throw PingoMatchTransitionError.actorNotInMatch
         }
 
-        let winner = match.players.first(where: { $0.id != actorID })?.id
+        let winnerIndex = match.players.count == 2 ? 1 - actorIndex : nil
+        let winner = winnerIndex.map { match.players[$0].id }
+        let updatedSeries = match.series?.recording(winnerIndex: winnerIndex)
         return PingoMatchEnvelope(
             id: match.id,
             gameID: match.gameID,
@@ -155,7 +165,45 @@ public enum PingoMatchReducer {
             currentPlayerID: nil,
             winnerPlayerID: winner,
             players: match.players,
-            gameState: match.gameState
+            gameState: match.gameState,
+            series: updatedSeries
+        )
+    }
+
+    public static func continueSeries(
+        _ match: PingoMatchEnvelope,
+        actorID: UUID,
+        now: Date = Date()
+    ) throws -> PingoMatchEnvelope {
+        guard match.status == .completed || match.status == .resigned,
+              let series = match.series,
+              !series.completed,
+              match.players.count == 2 else {
+            throw PingoMatchTransitionError.invalidStatus
+        }
+        guard match.players.contains(where: { $0.id == actorID }) else {
+            throw PingoMatchTransitionError.actorNotInMatch
+        }
+        guard match.createdByPlayerID == actorID else {
+            throw PingoMatchTransitionError.notActorsTurn
+        }
+
+        let starterIndex = max(0, series.gameNumber - 1) % 2
+        let boardState = PingoBoardGameEngine.initialStateData(for: match.gameID)
+        let initialState = boardState.isEmpty ? PingoPhysicsGameEngine.initialStateData(for: match.gameID) : boardState
+        return PingoMatchEnvelope(
+            gameID: match.gameID,
+            status: .active,
+            createdAt: now,
+            updatedAt: now,
+            expiresAt: Calendar.current.date(byAdding: .day, value: 7, to: now),
+            revision: 0,
+            turnNumber: 0,
+            createdByPlayerID: match.createdByPlayerID,
+            currentPlayerID: match.players[starterIndex].id,
+            players: match.players,
+            gameState: initialState,
+            series: series
         )
     }
 }

@@ -20,7 +20,7 @@ public struct PingoPlayerRef: Hashable, Codable, Sendable {
 }
 
 public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 2
+    public static let currentSchemaVersion = 3
 
     public let id: UUID
     public let schemaVersion: Int
@@ -36,6 +36,7 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
     public let winnerPlayerID: UUID?
     public let players: [PingoPlayerRef]
     public let gameState: Data
+    public let series: PingoSeriesState?
 
     public init(
         id: UUID = UUID(),
@@ -51,7 +52,8 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
         currentPlayerID: UUID? = nil,
         winnerPlayerID: UUID? = nil,
         players: [PingoPlayerRef] = [],
-        gameState: Data = Data()
+        gameState: Data = Data(),
+        series: PingoSeriesState? = nil
     ) {
         self.id = id
         self.schemaVersion = schemaVersion
@@ -67,6 +69,7 @@ public struct PingoMatchEnvelope: Identifiable, Hashable, Codable, Sendable {
         self.winnerPlayerID = winnerPlayerID
         self.players = players
         self.gameState = gameState
+        self.series = series
     }
 
     private static func canonicalTimestamp(_ date: Date) -> Date {

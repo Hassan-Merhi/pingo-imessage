@@ -6,11 +6,11 @@ public enum PingoGameCatalog {
         .init(id: .cupPong, name: "Cup Pong", symbol: "🏓", family: .arcade),
         .init(id: .basketball, name: "Basketball", symbol: "🏀", family: .arcade),
         .init(id: .darts, name: "Darts", symbol: "🎯", family: .precision),
-        .init(id: .miniGolf, name: "Mini Golf", symbol: "⛳️", family: .precision),
-        .init(id: .seaBattle, name: "Sea Battle", symbol: "⚓️", family: .strategy),
-        .init(id: .chess, name: "Chess", symbol: "♟️", family: .board),
-        .init(id: .checkers, name: "Checkers", symbol: "🔴", family: .board),
-        .init(id: .connectFour, name: "Connect Four", symbol: "🔵", family: .board),
+        .init(id: .miniGolf, name: "Mini Golf", symbol: "⛳️", family: .precision, isFreeAtLaunch: false),
+        .init(id: .seaBattle, name: "Sea Battle", symbol: "⚓️", family: .strategy, isFreeAtLaunch: false),
+        .init(id: .chess, name: "Chess", symbol: "♟️", family: .board, isFreeAtLaunch: false),
+        .init(id: .checkers, name: "Checkers", symbol: "🔴", family: .board, isFreeAtLaunch: false),
+        .init(id: .connectFour, name: "Connect Four", symbol: "🔵", family: .board, isFreeAtLaunch: false),
         .init(id: .ticTacToe, name: "Tic-Tac-Toe", symbol: "❌", family: .board)
     ]
 

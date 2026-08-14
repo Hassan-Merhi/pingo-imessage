@@ -9,7 +9,7 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     CURRENT_PROJECT_VERSION: 1
-    MARKETING_VERSION: 0.2.0
+    MARKETING_VERSION: 0.3.0
     TARGETED_DEVICE_FAMILY: "1,2"
 packages:
   PingoCore:
@@ -58,6 +58,7 @@ targets:
     dependencies:
       - package: PingoCore
       - sdk: Security.framework
+      - sdk: StoreKit.framework
 schemes:
   Pingo:
     build:
