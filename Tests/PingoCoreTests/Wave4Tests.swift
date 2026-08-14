@@ -17,8 +17,12 @@ final class Wave4Tests: XCTestCase {
         )
     }
 
-    func testAllTenLaunchGamesArePlayable() {
-        XCTAssertEqual(PingoPlayableGameRegistry.supportedGames, Set(PingoGameID.allCases))
+    func testAllTenOriginalGamesRemainPlayable() {
+        let originalGames: Set<PingoGameID> = [
+            .eightBall, .cupPong, .basketball, .darts, .miniGolf,
+            .seaBattle, .chess, .checkers, .connectFour, .ticTacToe
+        ]
+        XCTAssertEqual(PingoPlayableGameRegistry.supportedGames, originalGames)
     }
 
     func testEightBallDeterministicBreakAdvancesState() throws {
