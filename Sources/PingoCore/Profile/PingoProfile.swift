@@ -56,8 +56,13 @@ public struct PingoPublicProfile: Identifiable, Hashable, Codable, Sendable {
         self.username = username
         self.avatar = avatar
         self.stats = stats
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
+        self.createdAt = Self.canonicalTimestamp(createdAt)
+        self.updatedAt = Self.canonicalTimestamp(updatedAt)
+    }
+
+    private static func canonicalTimestamp(_ date: Date) -> Date {
+        let milliseconds = (date.timeIntervalSince1970 * 1_000).rounded()
+        return Date(timeIntervalSince1970: milliseconds / 1_000)
     }
 }
 
@@ -85,7 +90,10 @@ public struct PingoOpponentRecord: Hashable, Codable, Sendable {
         self.draws = draws
         self.currentStreak = currentStreak
         self.bestStreak = bestStreak
-        self.lastPlayedAt = lastPlayedAt
+        self.lastPlayedAt = lastPlayedAt.map { date in
+            let milliseconds = (date.timeIntervalSince1970 * 1_000).rounded()
+            return Date(timeIntervalSince1970: milliseconds / 1_000)
+        }
     }
 }
 
