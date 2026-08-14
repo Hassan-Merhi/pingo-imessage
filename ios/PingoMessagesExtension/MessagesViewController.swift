@@ -139,12 +139,16 @@ final class MessagesViewController: MSMessagesAppViewController {
         do {
             var match = payload.match
             for move in moves {
+                if case .seaBattleLockFleet(let fleet) = move {
+                    try PingoSeaBattlePrivateStore.shared.save(fleet, matchID: match.id)
+                }
                 match = try PingoBoardGameEngine.submit(
                     move: move,
                     to: match,
                     actorID: model.profile.id,
                     expectedRevision: match.revision
                 )
+                if match.status != .active { break }
             }
             let action: PingoMessageAction = match.status == .completed ? .completed : .turn
             let updated = PingoMessagePayload(action: action, sender: model.profile, match: match)
@@ -161,6 +165,10 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("That move is not legal.")
         } catch PingoGameRuleError.captureRequired {
             model.setStatus("A capture is available and must be played.")
+        } catch PingoGameRuleError.fleetNotReady {
+            model.setStatus("Finish placing all five ships before locking your fleet.")
+        } catch PingoGameRuleError.pendingShotRequired {
+            model.setStatus("Open the newest Sea Battle card before taking your shot.")
         } catch {
             model.setStatus("Pingo could not apply that move.")
         }
