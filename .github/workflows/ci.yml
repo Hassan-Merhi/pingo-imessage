@@ -20,6 +20,28 @@ jobs:
       - name: Test PingoCore
         run: swift test --parallel
 
+  backend:
+    name: Worker + D1 checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate Cloudflare types
+        run: npm run types
+      - name: Typecheck Worker
+        run: npm run typecheck
+      - name: Apply D1 migrations locally
+        run: npm run migrate:local
+      - name: Dry-run Worker bundle
+        run: npx wrangler deploy --dry-run --outdir dist
+
   ios-build:
     name: iMessage simulator build
     runs-on: macos-latest
