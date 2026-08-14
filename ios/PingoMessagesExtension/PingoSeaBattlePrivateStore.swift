@@ -20,12 +20,17 @@ final class PingoSeaBattlePrivateStore {
 
     func load(matchID: UUID) -> [PingoSeaBattlePlacement]? {
         guard let data = defaults.data(forKey: key(for: matchID)),
-              let fleet = try? decoder.decode([PingoSeaBattlePlacement].self, from: data),
-              (try? PingoSeaBattle.validateFleet(fleet)) != nil
+              let fleet = try? decoder.decode([PingoSeaBattlePlacement].self, from: data)
         else {
             return nil
         }
-        return fleet
+
+        do {
+            try PingoSeaBattle.validateFleet(fleet)
+            return fleet
+        } catch {
+            return nil
+        }
     }
 
     func remove(matchID: UUID) {
