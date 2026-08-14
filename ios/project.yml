@@ -1,0 +1,63 @@
+name: Pingo
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    TARGETED_DEVICE_FAMILY: "1,2"
+packages:
+  PingoCore:
+    path: ..
+targets:
+  Pingo:
+    type: application.messages
+    platform: iOS
+    sources:
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pingo.messages
+        PRODUCT_NAME: Pingo
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: Pingo/Info.plist
+      properties:
+        CFBundleDisplayName: Pingo
+    dependencies:
+      - target: PingoMessagesExtension
+        embed: true
+  PingoMessagesExtension:
+    type: app-extension.messages
+    platform: iOS
+    sources:
+      - path: PingoMessagesExtension
+      - path: SharedUI
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pingo.messages.extension
+        PRODUCT_NAME: Pingo Messages
+        APPLICATION_EXTENSION_API_ONLY: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: PingoMessagesExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Pingo
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.message-payload-provider
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).MessagesViewController
+    dependencies:
+      - package: PingoCore
+schemes:
+  Pingo:
+    build:
+      targets:
+        Pingo: all
+        PingoMessagesExtension: all

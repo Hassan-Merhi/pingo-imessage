@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Pingo logo</title>
+  <desc id="desc">A rounded purple tile with a white chat bubble, two playful game dots, and a speech tail.</desc>
+  <rect width="1024" height="1024" rx="250" fill="#6657E8"/>
+  <rect x="210" y="250" width="604" height="460" rx="160" fill="#FFFFFF"/>
+  <circle cx="390" cy="465" r="70" fill="#28C7B7"/>
+  <circle cx="634" cy="465" r="70" fill="#6657E8"/>
+  <path d="M590 688 L720 830 L505 748 Z" fill="#FFFFFF"/>
+</svg>

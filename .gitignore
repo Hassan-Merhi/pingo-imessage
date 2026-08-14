@@ -1,0 +1,38 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Generated Xcode project / derived Messages icon variants
+ios/Pingo.xcodeproj/
+ios/Resources/Assets.xcassets/iMessage App Icon.stickersiconset/*.png
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+Secrets.xcconfig
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/

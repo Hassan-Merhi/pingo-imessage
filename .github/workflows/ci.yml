@@ -1,0 +1,43 @@
+name: Pingo CI
+
+on:
+  push:
+    branches: [main, "phase/**", "wave/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    name: Swift core tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Test PingoCore
+        run: swift test --parallel
+
+  ios-build:
+    name: iMessage simulator build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Messages icon variants
+        run: bash ios/scripts/generate-imessage-icons.sh
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml
+      - name: Build unsigned simulator app
+        run: >-
+          xcodebuild
+          -project ios/Pingo.xcodeproj
+          -scheme Pingo
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
