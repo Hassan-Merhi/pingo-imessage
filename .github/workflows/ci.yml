@@ -42,6 +42,18 @@ jobs:
       - name: Dry-run Worker bundle
         run: npx wrangler deploy --dry-run --outdir dist
 
+  release-readiness:
+    name: Release readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate App Store release package
+        run: python3 scripts/validate-release.py
+      - name: Validate release shell scripts
+        run: |
+          bash -n ios/scripts/validate-release-env.sh
+          bash -n ios/scripts/app-store-archive.sh
+
   ios-build:
     name: iMessage simulator build
     runs-on: macos-latest
@@ -53,12 +65,14 @@ jobs:
         run: bash ios/scripts/generate-imessage-icons.sh
       - name: Generate Xcode project
         run: xcodegen generate --spec ios/project.yml
-      - name: Build unsigned simulator app
+      - name: Validate privacy manifest plist
+        run: plutil -lint ios/Resources/PrivacyInfo.xcprivacy
+      - name: Build unsigned Release simulator app
         run: >-
           xcodebuild
           -project ios/Pingo.xcodeproj
           -scheme Pingo
-          -configuration Debug
+          -configuration Release
           -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
           CODE_SIGNING_ALLOWED=NO
