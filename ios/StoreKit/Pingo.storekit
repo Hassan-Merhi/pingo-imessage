@@ -1,0 +1,120 @@
+{
+  "identifier" : "9A6A9F8B-32D8-4CB3-95CE-0B0D9F7C7001",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000001",
+      "localizations" : [
+        {
+          "description" : "Unlock Mini Golf, Sea Battle, Chess, Checkers, and Connect Four.",
+          "displayName" : "Premium Game Pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.premiumgames",
+      "referenceName" : "Premium Game Pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000002",
+      "localizations" : [
+        {
+          "description" : "Unlock Bowling, Penalty Shootout, Archery, Air Hockey, Mini Racing, and Reaction Battle.",
+          "displayName" : "Arcade Expansion",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.games.arcade",
+      "referenceName" : "Arcade Expansion",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "3.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000003",
+      "localizations" : [
+        {
+          "description" : "Unlock Draw & Guess, Word Hunt, Anagrams, and Trivia.",
+          "displayName" : "Word & Party Expansion",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.games.wordparty",
+      "referenceName" : "Word & Party Expansion",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000004",
+      "localizations" : [
+        {
+          "description" : "Unlock Crazy Eights and Ludo.",
+          "displayName" : "Classics Expansion",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.games.classics",
+      "referenceName" : "Classics Expansion",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000005",
+      "localizations" : [
+        {
+          "description" : "Neon arena, cue, and darts cosmetics.",
+          "displayName" : "Neon Pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.cosmetics.neon",
+      "referenceName" : "Neon Pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000006",
+      "localizations" : [
+        {
+          "description" : "Deep Space theme, Moon golf ball, and Orbit basketball cosmetics.",
+          "displayName" : "Space Pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.cosmetics.space",
+      "referenceName" : "Space Pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "1386E4A7-9A25-4C88-B720-000000000007",
+      "localizations" : [
+        {
+          "description" : "Crown avatar, Gold cups, and Gold cue cosmetics.",
+          "displayName" : "Gold Classics",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.pingo.cosmetics.classic",
+      "referenceName" : "Gold Classics",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0000000000",
+    "_developerTeamID" : ""
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
