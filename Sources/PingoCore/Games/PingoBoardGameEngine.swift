@@ -95,28 +95,29 @@ public enum PingoBoardGameEngine {
             return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                      nextPlayerID: opponentID, gameState: data, now: now)
 
-        case (.seaBattle, .seaBattlePlace(let ship, let start, let orientation)):
+        case (.seaBattle, .seaBattleLockFleet(let fleet)):
             let state = try decode(PingoSeaBattleState.self, data: match.gameState)
-            guard !state.fleetReady(player: 0) || !state.fleetReady(player: 1) else { throw PingoGameRuleError.invalidMove }
-            let next = try PingoSeaBattle.place(ship: ship, start: start, orientation: orientation, player: actorIndex, in: state)
+            let next = try PingoSeaBattle.lockFleet(player: actorIndex, placements: fleet, in: state)
             let data = try encoder.encode(next)
-            let nextPlayerID: UUID
-            if next.fleetReady(player: actorIndex) {
-                nextPlayerID = next.fleetReady(player: opponentIndex) ? match.players[0].id : opponentID
-            } else {
-                nextPlayerID = actorID
-            }
+            let nextPlayerID = next.fleetReady == [true, true] ? match.players[0].id : opponentID
             return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                      nextPlayerID: nextPlayerID, gameState: data, now: now)
 
-        case (.seaBattle, .seaBattleFire(let point)):
+        case (.seaBattle, .seaBattleResolvePending(let fleet)):
             let state = try decode(PingoSeaBattleState.self, data: match.gameState)
-            let result = try PingoSeaBattle.fire(at: point, player: actorIndex, in: state)
+            let result = try PingoSeaBattle.resolvePending(defender: actorIndex, fleet: fleet, in: state)
             let data = try encoder.encode(result.0)
             if let winner = result.winner {
                 return try PingoMatchReducer.completeTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                           winnerPlayerID: match.players[winner].id, gameState: data, now: now)
             }
+            return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
+                                                     nextPlayerID: actorID, gameState: data, now: now)
+
+        case (.seaBattle, .seaBattleFire(let point)):
+            let state = try decode(PingoSeaBattleState.self, data: match.gameState)
+            let next = try PingoSeaBattle.fire(at: point, player: actorIndex, in: state)
+            let data = try encoder.encode(next)
             return try PingoMatchReducer.submitTurn(match, actorID: actorID, expectedRevision: expectedRevision,
                                                      nextPlayerID: opponentID, gameState: data, now: now)
 
