@@ -319,7 +319,8 @@ private struct PingoCosmeticButton: View {
                         .foregroundStyle(Color.pingoPrimary)
                 }
             }
-            .frame(width: 86, minHeight: 72)
+            .frame(width: 86)
+            .frame(minHeight: 72)
             .padding(6)
             .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
         }
