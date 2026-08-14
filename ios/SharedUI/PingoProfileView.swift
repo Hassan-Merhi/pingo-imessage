@@ -120,36 +120,12 @@ struct PingoProfileView: View {
                     ForEach(PingoCosmeticSlot.allCases, id: \.self) { slot in
                         let cosmetics = ownedCosmetics(for: slot)
                         if !cosmetics.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(slotTitle(slot))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(cosmetics) { cosmetic in
-                                            Button {
-                                                equip(cosmetic)
-                                            } label: {
-                                                VStack(spacing: 4) {
-                                                    Text(cosmetic.symbol).font(.title2)
-                                                    Text(cosmetic.name)
-                                                        .font(.caption2)
-                                                        .lineLimit(1)
-                                                    if progression.equippedCosmetics[slot] == cosmetic.id {
-                                                        Image(systemName: "checkmark.circle.fill")
-                                                            .font(.caption)
-                                                            .foregroundStyle(Color.pingoPrimary)
-                                                    }
-                                                }
-                                                .frame(width: 86, minHeight: 72)
-                                                .padding(6)
-                                                .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
+                            PingoLockerSlotView(
+                                title: slotTitle(slot),
+                                cosmetics: cosmetics,
+                                equippedID: progression.equippedCosmetics[slot],
+                                onSelect: equip
+                            )
                         }
                     }
                 }
@@ -293,6 +269,61 @@ struct PingoProfileView: View {
         case "wave": return "🌊"
         default: return "🎮"
         }
+    }
+}
+
+private struct PingoLockerSlotView: View {
+    let title: String
+    let cosmetics: [PingoCosmeticDescriptor]
+    let equippedID: String?
+    let onSelect: (PingoCosmeticDescriptor) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(cosmetics) { cosmetic in
+                        PingoCosmeticButton(
+                            cosmetic: cosmetic,
+                            isEquipped: equippedID == cosmetic.id,
+                            onSelect: onSelect
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PingoCosmeticButton: View {
+    let cosmetic: PingoCosmeticDescriptor
+    let isEquipped: Bool
+    let onSelect: (PingoCosmeticDescriptor) -> Void
+
+    var body: some View {
+        Button {
+            onSelect(cosmetic)
+        } label: {
+            VStack(spacing: 4) {
+                Text(cosmetic.symbol)
+                    .font(.title2)
+                Text(cosmetic.name)
+                    .font(.caption2)
+                    .lineLimit(1)
+                if isEquipped {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.pingoPrimary)
+                }
+            }
+            .frame(width: 86, minHeight: 72)
+            .padding(6)
+            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 }
 
