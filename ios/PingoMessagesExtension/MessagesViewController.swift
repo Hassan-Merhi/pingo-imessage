@@ -24,6 +24,9 @@ final class MessagesViewController: MSMessagesAppViewController {
             onAccept: { [weak self] in
                 self?.acceptSelectedChallenge()
             },
+            onMoves: { [weak self] moves in
+                self?.submitGameMoves(moves)
+            },
             onResign: { [weak self] in
                 self?.resignSelectedMatch()
             }
@@ -70,7 +73,7 @@ final class MessagesViewController: MSMessagesAppViewController {
 
     override func didStartSending(_ message: MSMessage, conversation: MSConversation) {
         super.didStartSending(message, conversation: conversation)
-        model.setStatus("Pingo challenge sent")
+        model.setStatus("Pingo message sent")
     }
 
     override func didCancelSending(_ message: MSMessage, conversation: MSConversation) {
@@ -119,6 +122,47 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("Acceptance added to the message box — tap Send.")
         } catch {
             model.setStatus("This challenge is stale or already accepted.")
+        }
+    }
+
+    private func submitGameMoves(_ moves: [PingoGameMove]) {
+        guard !moves.isEmpty,
+              let conversation = activeConversation,
+              let payload = model.incomingPayload,
+              payload.match.status == .active,
+              payload.match.currentPlayerID == model.profile.id
+        else {
+            model.setStatus("It is not your turn in this match.")
+            return
+        }
+
+        do {
+            var match = payload.match
+            for move in moves {
+                match = try PingoBoardGameEngine.submit(
+                    move: move,
+                    to: match,
+                    actorID: model.profile.id,
+                    expectedRevision: match.revision
+                )
+            }
+            let action: PingoMessageAction = match.status == .completed ? .completed : .turn
+            let updated = PingoMessagePayload(action: action, sender: model.profile, match: match)
+            let session = conversation.selectedMessage?.session ?? MSSession()
+            let message = try PingoMessageFactory.make(payload: updated, session: session)
+            conversation.insert(message)
+            model.incomingPayload = updated
+            model.setStatus(match.status == .completed ? "Result added to the message box — tap Send." : "Move added to the message box — tap Send.")
+        } catch PingoMatchTransitionError.staleRevision {
+            model.setStatus("That match changed. Open the newest Pingo message and try again.")
+        } catch PingoMatchTransitionError.notActorsTurn {
+            model.setStatus("It is not your turn yet.")
+        } catch PingoGameRuleError.invalidMove {
+            model.setStatus("That move is not legal.")
+        } catch PingoGameRuleError.captureRequired {
+            model.setStatus("A capture is available and must be played.")
+        } catch {
+            model.setStatus("Pingo could not apply that move.")
         }
     }
 
