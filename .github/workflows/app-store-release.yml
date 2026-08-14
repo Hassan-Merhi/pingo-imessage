@@ -53,18 +53,24 @@ jobs:
           test -n "$ASC_KEY"
           test -n "$CERT_P12"
           test -n "$CERT_PASSWORD"
+          bash ios/scripts/validate-release-env.sh
 
       - name: Install signing certificate
         env:
           CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ runner.temp }}-pingo-keychain
+          KEYCHAIN_PASSWORD: pingo-${{ github.run_id }}
         run: |
-          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+          CERT_P12="$CERT_P12" python3 - <<'PY'
+          import base64, os, pathlib
+          pathlib.Path(os.environ["RUNNER_TEMP"], "distribution.p12").write_bytes(
+              base64.b64decode(os.environ["CERT_P12"], validate=True)
+          )
+          PY
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
           security set-keychain-settings -lut 21600 "$RUNNER_TEMP/pingo.keychain-db"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
-          security import "$RUNNER_TEMP/distribution.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$RUNNER_TEMP/pingo.keychain-db"
+          security import "$RUNNER_TEMP/distribution.p12" -P "$CERT_PASSWORD" -A -f pkcs12 -k "$RUNNER_TEMP/pingo.keychain-db"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
           security list-keychain -d user -s "$RUNNER_TEMP/pingo.keychain-db" login.keychain-db
 
