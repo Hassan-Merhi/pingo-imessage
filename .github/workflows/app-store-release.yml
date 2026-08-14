@@ -1,0 +1,113 @@
+name: App Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: App Store marketing version
+        required: true
+        default: "1.0.0"
+      build_number:
+        description: Monotonically increasing build number
+        required: true
+        default: "1"
+      api_base_url:
+        description: Production Pingo API URL
+        required: true
+      message_base_url:
+        description: Production Pingo message URL
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  MARKETING_VERSION: ${{ inputs.marketing_version }}
+  CURRENT_PROJECT_VERSION: ${{ inputs.build_number }}
+  PINGO_API_BASE_URL: ${{ inputs.api_base_url }}
+  PINGO_MESSAGE_BASE_URL: ${{ inputs.message_base_url }}
+  DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+  APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+  APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+jobs:
+  release:
+    name: Signed archive and App Store upload
+    runs-on: macos-latest
+    environment: app-store
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate repository release metadata
+        run: python3 scripts/validate-release.py
+
+      - name: Require release credentials
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+        run: |
+          test -n "$DEVELOPMENT_TEAM"
+          test -n "$APP_STORE_CONNECT_KEY_ID"
+          test -n "$APP_STORE_CONNECT_ISSUER_ID"
+          test -n "$ASC_KEY"
+          test -n "$CERT_P12"
+          test -n "$CERT_PASSWORD"
+          bash ios/scripts/validate-release-env.sh
+
+      - name: Install signing certificate
+        env:
+          CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: pingo-${{ github.run_id }}
+        run: |
+          CERT_P12="$CERT_P12" python3 - <<'PY'
+          import base64, os, pathlib
+          pathlib.Path(os.environ["RUNNER_TEMP"], "distribution.p12").write_bytes(
+              base64.b64decode(os.environ["CERT_P12"], validate=True)
+          )
+          PY
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/pingo.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
+          security import "$RUNNER_TEMP/distribution.p12" -P "$CERT_PASSWORD" -A -f pkcs12 -k "$RUNNER_TEMP/pingo.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/pingo.keychain-db"
+          security list-keychain -d user -s "$RUNNER_TEMP/pingo.keychain-db" login.keychain-db
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc" "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_KEY" > "$RUNNER_TEMP/asc/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/asc/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          cp "$RUNNER_TEMP/asc/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          echo "APP_STORE_CONNECT_KEY_PATH=$RUNNER_TEMP/asc/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build signed App Store IPA
+        run: bash ios/scripts/app-store-archive.sh
+
+      - name: Upload to App Store Connect
+        run: |
+          IPA="$(find build/app-store/export -maxdepth 1 -name '*.ipa' -print -quit)"
+          test -n "$IPA"
+          xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+      - name: Preserve IPA and export logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pingo-${{ inputs.marketing_version }}-${{ inputs.build_number }}
+          path: |
+            build/app-store/export/*.ipa
+            build/app-store/export/*.log
+          if-no-files-found: error
+
+      - name: Clean signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/pingo.keychain-db" || true
+          rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/distribution.p12"
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"

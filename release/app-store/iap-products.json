@@ -1,0 +1,53 @@
+{
+  "products": [
+    {
+      "referenceName": "Premium Game Pack",
+      "productID": "com.pingo.premiumgames",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Premium Game Pack",
+      "description": "Unlock Mini Golf, Sea Battle, Chess, Checkers, and Connect Four."
+    },
+    {
+      "referenceName": "Arcade Expansion",
+      "productID": "com.pingo.games.arcade",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Arcade Expansion",
+      "description": "Unlock Bowling, Penalty Shootout, Archery, Air Hockey, Mini Racing, and Reaction Battle."
+    },
+    {
+      "referenceName": "Word & Party Expansion",
+      "productID": "com.pingo.games.wordparty",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Word & Party Expansion",
+      "description": "Unlock Draw & Guess, Word Hunt, Anagrams, and Trivia."
+    },
+    {
+      "referenceName": "Classics Expansion",
+      "productID": "com.pingo.games.classics",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Classics Expansion",
+      "description": "Unlock Crazy Eights and Ludo."
+    },
+    {
+      "referenceName": "Neon Pack",
+      "productID": "com.pingo.cosmetics.neon",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Neon Pack",
+      "description": "Unlock the Neon arena, cue, and darts cosmetics."
+    },
+    {
+      "referenceName": "Space Pack",
+      "productID": "com.pingo.cosmetics.space",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Space Pack",
+      "description": "Unlock the Deep Space theme, Moon golf ball, and Orbit basketball cosmetics."
+    },
+    {
+      "referenceName": "Gold Classics",
+      "productID": "com.pingo.cosmetics.classic",
+      "type": "NON_CONSUMABLE",
+      "displayName": "Gold Classics",
+      "description": "Unlock the Crown avatar, Gold cups, and Gold cue cosmetics."
+    }
+  ]
+}

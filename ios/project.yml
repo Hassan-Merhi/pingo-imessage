@@ -9,8 +9,10 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     CURRENT_PROJECT_VERSION: 1
-    MARKETING_VERSION: 0.3.0
+    MARKETING_VERSION: 1.0.0
     TARGETED_DEVICE_FAMILY: "1,2"
+    PINGO_API_BASE_URL: https://api.pingo.invalid/v1
+    PINGO_MESSAGE_BASE_URL: https://pingo.invalid/match
 packages:
   PingoCore:
     path: ..
@@ -30,6 +32,7 @@ targets:
       path: Pingo/Info.plist
       properties:
         CFBundleDisplayName: Pingo
+        ITSAppUsesNonExemptEncryption: false
     dependencies:
       - target: PingoMessagesExtension
         embed: true
@@ -50,8 +53,8 @@ targets:
       path: PingoMessagesExtension/Info.plist
       properties:
         CFBundleDisplayName: Pingo
-        PingoAPIBaseURL: https://api.pingo.invalid/v1
-        PingoMessageBaseURL: https://pingo.invalid/match
+        PingoAPIBaseURL: $(PINGO_API_BASE_URL)
+        PingoMessageBaseURL: $(PINGO_MESSAGE_BASE_URL)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.message-payload-provider
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).MessagesViewController
@@ -65,3 +68,8 @@ schemes:
       targets:
         Pingo: all
         PingoMessagesExtension: all
+    run:
+      config: Debug
+      storeKitConfiguration: StoreKit/Pingo.storekit
+    archive:
+      config: Release

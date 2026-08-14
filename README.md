@@ -2,7 +2,7 @@
 
 Pingo is a family-friendly collection of competitive mini-games built specifically for Apple Messages/iMessage.
 
-## Current status — Waves 1–6
+## Current status — Waves 1–7
 
 Wave 1 established the standalone iMessage project, shared Swift core, original Pingo branding, reproducible Xcode generation, and CI.
 
@@ -14,7 +14,9 @@ Wave 4 added five deterministic physics/precision games: 8-Ball, Cup Pong, Baske
 
 Wave 5 added Single/Best-of-3/Best-of-5 series, Random Game, XP/levels, achievements, W/L/D records, streaks, match/friend history, cosmetic inventory, StoreKit 2 purchase/restore plumbing, and authenticated progression sync. Paid ownership remains derived from verified StoreKit transactions rather than client-writable progression data.
 
-Wave 6 expands the playable catalog to **22 games** with a deterministic extra-game engine and three additional one-time game packs.
+Wave 6 expanded the playable catalog to **22 games** with a deterministic extra-game engine and three additional one-time game packs.
+
+Wave 7 makes the repository **App Store/TestFlight release-ready for Pingo 1.0.0**: privacy manifest, local StoreKit product catalog, App Store/IAP metadata, production-environment validation, signed archive/export automation, protected manual App Store upload workflow, public privacy/support source text, submission checklists, and a dedicated release-readiness CI gate.
 
 All games use the same match envelope and revision guard. A player makes a move inside Messages, Pingo simulates or validates it locally, prepares the updated interactive message in the compose field, and the player sends that card back to the opponent.
 
@@ -54,13 +56,13 @@ Five original games remain free: 8-Ball, Cup Pong, Basketball, Darts, and Tic-Ta
 
 The original **Premium Game Pack** contains Mini Golf, Sea Battle, Chess, Checkers, and Connect Four.
 
-Wave 6 adds three separate expansion entitlements:
+Wave 6 added three separate expansion entitlements:
 
 - **Arcade Expansion:** Bowling, Penalty Shootout, Archery, Air Hockey, Mini Racing, Reaction Battle
 - **Word & Party Expansion:** Draw & Guess, Word Hunt, Anagrams, Trivia
 - **Classics Expansion:** Crazy Eights, Ludo
 
-Pingo also defines the Neon, Space, and Gold Classics cosmetic packs. StoreKit identifiers are implemented, but live App Store Connect product creation/pricing and Apple signing remain Wave 7 release work.
+Pingo also defines the Neon, Space, and Gold Classics cosmetic packs. All seven product identifiers have a matching Wave 7 local StoreKit test product and App Store metadata record. Production price/availability still belongs in App Store Connect.
 
 Pingo has no coins, loot boxes, wagering, or real-money gambling mechanics.
 
@@ -80,6 +82,14 @@ Crazy Eights hides the opponent hand in the UI, and Draw & Guess shows the promp
 swift test
 ```
 
+### Release package validation
+
+```bash
+python3 scripts/validate-release.py
+```
+
+This checks the Pingo 1.0 version contract, bundle IDs, privacy manifest, StoreKit product parity, App Store metadata limits, required release files, and committed-secret policy.
+
 ### iOS / iMessage app (macOS)
 
 The Xcode project is generated from `ios/project.yml` using XcodeGen. Pingo keeps one square master icon in git; the Apple-required Messages extension icon variants are generated locally before project generation.
@@ -92,6 +102,23 @@ open ios/Pingo.xcodeproj
 ```
 
 Select the **Pingo** scheme and an iPhone simulator. `PingoMessagesExtension` is embedded in the standalone iMessage app container; Pingo does not ship a normal home-screen iOS app.
+
+For local StoreKit purchase testing, open `ios/StoreKit/Pingo.storekit` in Xcode and attach it to the Pingo run scheme.
+
+### Signed App Store archive
+
+Real archives require the Apple team ID and live HTTPS service URLs outside git:
+
+```bash
+export DEVELOPMENT_TEAM=YOUR10CHARTEAMID
+export PINGO_API_BASE_URL=https://your-api.example/v1
+export PINGO_MESSAGE_BASE_URL=https://your-domain.example/match
+export MARKETING_VERSION=1.0.0
+export CURRENT_PROJECT_VERSION=1
+bash ios/scripts/app-store-archive.sh
+```
+
+`ios/scripts/validate-release-env.sh` refuses placeholder/non-HTTPS production URLs. App Store Connect API-key variables can be supplied for automatic provisioning. See [`docs/architecture/WAVE-7.md`](docs/architecture/WAVE-7.md) and [`release/app-store/APP-STORE-CHECKLIST.md`](release/app-store/APP-STORE-CHECKLIST.md).
 
 ### Backend checks
 
@@ -109,6 +136,7 @@ npx wrangler deploy --dry-run --outdir dist
 - `main` stays green/releasable.
 - Development happens on phase/wave branches and merges through verified PRs.
 - Never commit signing certificates, provisioning profiles, `.env` files, API keys, bearer tokens, or production secrets.
+- The signed App Store workflow is manual-only and expects secrets from the protected `app-store` GitHub environment.
 
 ## Architecture
 
@@ -119,4 +147,5 @@ npx wrangler deploy --dry-run --outdir dist
 - [`docs/architecture/WAVE-5.md`](docs/architecture/WAVE-5.md)
 - [`docs/architecture/WAVE-5-CLOSURE.md`](docs/architecture/WAVE-5-CLOSURE.md)
 - [`docs/architecture/WAVE-6.md`](docs/architecture/WAVE-6.md)
+- [`docs/architecture/WAVE-7.md`](docs/architecture/WAVE-7.md)
 - [`docs/architecture/SECURITY.md`](docs/architecture/SECURITY.md)
