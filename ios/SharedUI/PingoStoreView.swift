@@ -16,19 +16,40 @@ struct PingoStoreView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Play more. Personalize Pingo.")
                             .font(.headline)
-                        Text("All purchases are one-time, family-friendly digital unlocks. No coins, loot boxes, or gambling mechanics.")
+                        Text("All purchases are one-time, family-friendly digital unlocks. No coins, loot boxes, wagering, or gambling mechanics.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
 
-                Section("Game Pack") {
+                Section("Original Game Pack") {
                     storeRow(
                         .premiumGames,
                         title: "Premium Game Pack",
-                        subtitle: premiumGameNames,
+                        subtitle: names(in: PingoAccessPolicy.premiumGames),
                         symbol: "🎮"
+                    )
+                }
+
+                Section("Expansion Game Packs") {
+                    storeRow(
+                        .arcadeExpansion,
+                        title: "Arcade Expansion",
+                        subtitle: names(in: PingoAccessPolicy.arcadeExpansionGames),
+                        symbol: "🕹️"
+                    )
+                    storeRow(
+                        .wordPartyExpansion,
+                        title: "Word & Party Expansion",
+                        subtitle: names(in: PingoAccessPolicy.wordPartyExpansionGames),
+                        symbol: "🧠"
+                    )
+                    storeRow(
+                        .classicsExpansion,
+                        title: "Classics Expansion",
+                        subtitle: names(in: PingoAccessPolicy.classicsExpansionGames),
+                        symbol: "🎲"
                     )
                 }
 
@@ -62,7 +83,7 @@ struct PingoStoreView: View {
                 }
 
                 Section("Free Games") {
-                    Text(freeGameNames)
+                    Text(names(in: PingoAccessPolicy.freeGames))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -130,16 +151,9 @@ struct PingoStoreView: View {
         .padding(.vertical, 4)
     }
 
-    private var freeGameNames: String {
+    private func names(in gameIDs: Set<PingoGameID>) -> String {
         PingoGameCatalog.launch
-            .filter { PingoAccessPolicy.freeGames.contains($0.id) }
-            .map(\.name)
-            .joined(separator: " • ")
-    }
-
-    private var premiumGameNames: String {
-        PingoGameCatalog.launch
-            .filter { PingoAccessPolicy.premiumGames.contains($0.id) }
+            .filter { gameIDs.contains($0.id) }
             .map(\.name)
             .joined(separator: " • ")
     }
