@@ -11,6 +11,20 @@ public enum PingoGameID: String, CaseIterable, Codable, Sendable {
     case checkers
     case connectFour
     case ticTacToe
+
+    // Wave 6 expansion games
+    case bowling
+    case penaltyShootout
+    case archery
+    case airHockey
+    case drawAndGuess
+    case wordHunt
+    case anagrams
+    case trivia
+    case crazyEights
+    case ludo
+    case miniRacing
+    case reactionBattle
 }
 
 public enum PingoGameFamily: String, Codable, Sendable {
@@ -18,6 +32,10 @@ public enum PingoGameFamily: String, Codable, Sendable {
     case arcade
     case board
     case strategy
+    case word
+    case party
+    case cards
+    case racing
 }
 
 public struct PingoGameDescriptor: Identifiable, Hashable, Codable, Sendable {
