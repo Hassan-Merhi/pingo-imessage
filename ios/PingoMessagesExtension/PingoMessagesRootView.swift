@@ -5,10 +5,11 @@ import SwiftUI
 struct PingoMessagesRootView: View {
     @ObservedObject var model: MessagesExtensionModel
     let onRequestExpanded: () -> Void
-    let onChallenge: (PingoGameID) -> Void
+    let onChallenge: (PingoGameID, PingoSeriesFormat) -> Void
     let onAccept: () -> Void
     let onMoves: ([PingoGameMove]) -> Void
     let onPhysicsMove: (PingoPhysicsMove) -> Void
+    let onContinueSeries: () -> Void
     let onResign: () -> Void
 
     var body: some View {
@@ -22,20 +23,34 @@ struct PingoMessagesRootView: View {
                             PingoIncomingMatchView(
                                 payload: payload,
                                 localProfile: model.profile,
+                                entitlements: model.progression.entitlements,
                                 onAccept: onAccept,
                                 onMoves: onMoves,
                                 onPhysicsMove: onPhysicsMove,
+                                onContinueSeries: onContinueSeries,
                                 onResign: onResign,
+                                onOpenStore: model.showStore,
                                 onClose: model.clearIncomingMatch
                             )
                         } else {
-                            PingoHomeView(onChallenge: onChallenge)
+                            PingoHomeView(
+                                progression: model.progression,
+                                onChallenge: onChallenge,
+                                onOpenStore: model.showStore
+                            )
                         }
                     }
                     .navigationTitle("Pingo")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            Button {
+                                model.showStore()
+                            } label: {
+                                Image(systemName: "bag")
+                            }
+                            .accessibilityLabel("Pingo store")
+
                             Button {
                                 model.isProfilePresented = true
                             } label: {
@@ -59,9 +74,23 @@ struct PingoMessagesRootView: View {
             }
         }
         .sheet(isPresented: $model.isProfilePresented) {
-            PingoProfileView(profile: model.profile) { username, avatar in
-                try model.updateProfile(username: username, avatar: avatar)
-            }
+            PingoProfileView(
+                profile: model.profile,
+                progression: $model.progression,
+                onSave: { username, avatar in
+                    try model.updateProfile(username: username, avatar: avatar)
+                },
+                onEquip: { cosmeticID in
+                    try model.equip(cosmeticID: cosmeticID)
+                }
+            )
+        }
+        .sheet(isPresented: $model.isStorePresented) {
+            PingoStoreView(
+                manager: model.storeManager,
+                entitlements: model.progression.entitlements,
+                onEntitlementsChanged: model.applyVerifiedStoreEntitlements
+            )
         }
         .animation(.easeInOut(duration: 0.2), value: model.presentationStyle)
     }

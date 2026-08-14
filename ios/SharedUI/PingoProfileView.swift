@@ -3,7 +3,9 @@ import SwiftUI
 
 struct PingoProfileView: View {
     let profile: PingoPublicProfile
+    @Binding var progression: PingoProgressionState
     let onSave: (String, PingoAvatar) throws -> Void
+    let onEquip: (String) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var username: String
@@ -15,9 +17,16 @@ struct PingoProfileView: View {
     private let presets = ["ping", "orbit", "bolt", "star", "rocket", "smile", "trophy", "wave"]
     private let backgrounds = ["mint", "blue", "purple", "orange", "pink", "slate"]
 
-    init(profile: PingoPublicProfile, onSave: @escaping (String, PingoAvatar) throws -> Void) {
+    init(
+        profile: PingoPublicProfile,
+        progression: Binding<PingoProgressionState>,
+        onSave: @escaping (String, PingoAvatar) throws -> Void,
+        onEquip: @escaping (String) throws -> Void
+    ) {
         self.profile = profile
+        _progression = progression
         self.onSave = onSave
+        self.onEquip = onEquip
         _username = State(initialValue: profile.username)
         _avatarKind = State(initialValue: profile.avatar.kind)
         _avatarValue = State(initialValue: profile.avatar.value)
@@ -30,12 +39,17 @@ struct PingoProfileView: View {
                 Section("Profile") {
                     HStack(spacing: 14) {
                         avatarPreview
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text("@\(username.isEmpty ? "username" : username)")
                                 .font(.headline)
-                            Text("Pingo player")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Text("Level \(progression.level) • \(progression.xp) XP")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.pingoPrimary)
+                            ProgressView(
+                                value: Double(progression.xpIntoLevel),
+                                total: Double(PingoProgression.xpPerLevel)
+                            )
+                            .tint(.pingoPrimary)
                         }
                     }
                     TextField("Pingo username", text: $username)
@@ -76,13 +90,113 @@ struct PingoProfileView: View {
                     }
                 }
 
-                Section("Stats") {
+                Section("Competitive Stats") {
                     HStack {
-                        stat("Wins", profile.stats.wins)
+                        stat("Wins", progression.wins)
                         Spacer()
-                        stat("Losses", profile.stats.losses)
+                        stat("Losses", progression.losses)
                         Spacer()
-                        stat("Streak", profile.stats.currentStreak)
+                        stat("Draws", progression.draws)
+                        Spacer()
+                        stat("Streak", progression.currentStreak)
+                    }
+                    if progression.bestStreak > 0 {
+                        LabeledContent("Best streak", value: "\(progression.bestStreak)")
+                    }
+                }
+
+                Section("Achievements") {
+                    if progression.achievements.isEmpty {
+                        Text("Play matches to unlock achievements.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(progression.achievements.sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { achievement in
+                            Label(achievement.title, icon: achievement.symbol)
+                        }
+                    }
+                }
+
+                Section("Locker") {
+                    ForEach(PingoCosmeticSlot.allCases, id: \.self) { slot in
+                        let cosmetics = ownedCosmetics(for: slot)
+                        if !cosmetics.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(slotTitle(slot))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(cosmetics) { cosmetic in
+                                            Button {
+                                                equip(cosmetic)
+                                            } label: {
+                                                VStack(spacing: 4) {
+                                                    Text(cosmetic.symbol).font(.title2)
+                                                    Text(cosmetic.name)
+                                                        .font(.caption2)
+                                                        .lineLimit(1)
+                                                    if progression.equippedCosmetics[slot] == cosmetic.id {
+                                                        Image(systemName: "checkmark.circle.fill")
+                                                            .font(.caption)
+                                                            .foregroundStyle(Color.pingoPrimary)
+                                                    }
+                                                }
+                                                .frame(width: 86, minHeight: 72)
+                                                .padding(6)
+                                                .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Recent Matches") {
+                    if progression.history.isEmpty {
+                        Text("Your match history will appear here.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(progression.history.prefix(6))) { entry in
+                            HStack {
+                                Text(PingoGameCatalog.game(id: entry.gameID)?.symbol ?? "🎮")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(PingoGameCatalog.game(id: entry.gameID)?.name ?? "Pingo")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("vs @\(entry.opponentName)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(entry.result.rawValue.capitalized)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(entry.result == .win ? Color.pingoPrimary : .secondary)
+                            }
+                        }
+                    }
+                }
+
+                Section("Friend Records") {
+                    if progression.opponentRecords.isEmpty {
+                        Text("Friend-specific records appear after you finish matches.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(progression.opponentRecords.prefix(6)), id: \.opponentID) { record in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("@\(opponentName(for: record.opponentID))")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Best streak \(record.bestStreak)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text("\(record.wins)-\(record.losses)-\(record.draws)")
+                                    .font(.subheadline.monospacedDigit())
+                            }
+                        }
                     }
                 }
 
@@ -116,7 +230,36 @@ struct PingoProfileView: View {
     private func stat(_ label: String, _ value: Int) -> some View {
         VStack(spacing: 3) {
             Text("\(value)").font(.headline)
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private func ownedCosmetics(for slot: PingoCosmeticSlot) -> [PingoCosmeticDescriptor] {
+        PingoCosmeticCatalog.all.filter { $0.slot == slot && progression.ownedCosmetics.contains($0.id) }
+    }
+
+    private func equip(_ cosmetic: PingoCosmeticDescriptor) {
+        do {
+            try onEquip(cosmetic.id)
+            validationMessage = nil
+        } catch {
+            validationMessage = "Pingo could not equip that cosmetic."
+        }
+    }
+
+    private func opponentName(for id: UUID) -> String {
+        progression.history.first(where: { $0.opponentID == id })?.opponentName ?? "friend"
+    }
+
+    private func slotTitle(_ slot: PingoCosmeticSlot) -> String {
+        switch slot {
+        case .avatar: "Avatar Cosmetics"
+        case .theme: "Themes"
+        case .cue: "Pool Cues"
+        case .darts: "Darts"
+        case .golfBall: "Golf Balls"
+        case .cup: "Cup Pong"
+        case .basketball: "Basketballs"
         }
     }
 
@@ -149,6 +292,16 @@ struct PingoProfileView: View {
         case "trophy": return "🏆"
         case "wave": return "🌊"
         default: return "🎮"
+        }
+    }
+}
+
+private extension Label where Title == Text, Icon == Text {
+    init(_ title: String, icon: String) {
+        self.init {
+            Text(title)
+        } icon: {
+            Text(icon)
         }
     }
 }

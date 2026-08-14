@@ -15,24 +15,15 @@ final class MessagesViewController: MSMessagesAppViewController {
     private func installSwiftUIRoot() {
         let root = PingoMessagesRootView(
             model: model,
-            onRequestExpanded: { [weak self] in
-                self?.requestPresentationStyle(.expanded)
+            onRequestExpanded: { [weak self] in self?.requestPresentationStyle(.expanded) },
+            onChallenge: { [weak self] gameID, format in
+                self?.insertChallenge(gameID: gameID, seriesFormat: format)
             },
-            onChallenge: { [weak self] gameID in
-                self?.insertChallenge(gameID: gameID)
-            },
-            onAccept: { [weak self] in
-                self?.acceptSelectedChallenge()
-            },
-            onMoves: { [weak self] moves in
-                self?.submitGameMoves(moves)
-            },
-            onPhysicsMove: { [weak self] move in
-                self?.submitPhysicsMove(move)
-            },
-            onResign: { [weak self] in
-                self?.resignSelectedMatch()
-            }
+            onAccept: { [weak self] in self?.acceptSelectedChallenge() },
+            onMoves: { [weak self] moves in self?.submitGameMoves(moves) },
+            onPhysicsMove: { [weak self] move in self?.submitPhysicsMove(move) },
+            onContinueSeries: { [weak self] in self?.continueSelectedSeries() },
+            onResign: { [weak self] in self?.resignSelectedMatch() }
         )
         let host = UIHostingController(rootView: root)
         addChild(host)
@@ -76,6 +67,7 @@ final class MessagesViewController: MSMessagesAppViewController {
 
     override func didStartSending(_ message: MSMessage, conversation: MSConversation) {
         super.didStartSending(message, conversation: conversation)
+        model.recordSentResult(from: message)
         model.setStatus("Pingo message sent")
     }
 
@@ -84,7 +76,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         model.setStatus("Send cancelled")
     }
 
-    private func insertChallenge(gameID: PingoGameID) {
+    private func insertChallenge(gameID: PingoGameID, seriesFormat: PingoSeriesFormat) {
         guard let conversation = activeConversation else {
             model.setStatus("Open Pingo inside an iMessage conversation first.")
             return
@@ -93,13 +85,23 @@ final class MessagesViewController: MSMessagesAppViewController {
             model.setStatus("That Pingo game is not playable in this build.")
             return
         }
+        guard model.canPlay(gameID) else {
+            model.showStore()
+            model.setStatus("Unlock the Premium Game Pack to challenge someone to that game.")
+            return
+        }
 
         do {
-            let match = PingoMatchReducer.challenge(gameID: gameID, creator: model.profile)
+            let match = PingoMatchReducer.challenge(
+                gameID: gameID,
+                creator: model.profile,
+                seriesFormat: seriesFormat
+            )
             let payload = PingoMessagePayload(action: .challenge, sender: model.profile, match: match)
             let message = try PingoMessageFactory.make(payload: payload, session: MSSession())
             conversation.insert(message)
-            model.setStatus("Challenge added to the message box — tap Send.")
+            let label = seriesFormat == .single ? "Challenge" : seriesFormat.title
+            model.setStatus("\(label) added to the message box — tap Send.")
         } catch {
             model.setStatus("Pingo could not create that challenge.")
         }
@@ -109,9 +111,13 @@ final class MessagesViewController: MSMessagesAppViewController {
         guard let conversation = activeConversation,
               let payload = model.incomingPayload,
               payload.match.status == .awaitingOpponent,
-              payload.sender.id != model.profile.id
-        else {
+              payload.sender.id != model.profile.id else {
             model.setStatus("This challenge cannot be accepted.")
+            return
+        }
+        guard model.canPlay(payload.match.gameID) else {
+            model.showStore()
+            model.setStatus("Unlock the Premium Game Pack to accept this challenge.")
             return
         }
 
@@ -125,6 +131,7 @@ final class MessagesViewController: MSMessagesAppViewController {
                 let initial = PingoPhysicsGameEngine.initialStateData(for: match.gameID)
                 match = PingoMatchEnvelope(
                     id: match.id,
+                    schemaVersion: match.schemaVersion,
                     gameID: match.gameID,
                     status: match.status,
                     createdAt: match.createdAt,
@@ -136,7 +143,8 @@ final class MessagesViewController: MSMessagesAppViewController {
                     currentPlayerID: match.currentPlayerID,
                     winnerPlayerID: match.winnerPlayerID,
                     players: match.players,
-                    gameState: initial
+                    gameState: initial,
+                    series: match.series
                 )
             }
             let accepted = PingoMessagePayload(action: .accepted, sender: model.profile, match: match)
@@ -155,9 +163,13 @@ final class MessagesViewController: MSMessagesAppViewController {
               let conversation = activeConversation,
               let payload = model.incomingPayload,
               payload.match.status == .active,
-              payload.match.currentPlayerID == model.profile.id
-        else {
+              payload.match.currentPlayerID == model.profile.id else {
             model.setStatus("It is not your turn in this match.")
+            return
+        }
+        guard model.canPlay(payload.match.gameID) else {
+            model.showStore()
+            model.setStatus("Unlock the Premium Game Pack to continue this match.")
             return
         }
 
@@ -198,9 +210,13 @@ final class MessagesViewController: MSMessagesAppViewController {
               let payload = model.incomingPayload,
               payload.match.status == .active,
               payload.match.currentPlayerID == model.profile.id,
-              PingoPhysicsGameEngine.supportedGames.contains(payload.match.gameID)
-        else {
+              PingoPhysicsGameEngine.supportedGames.contains(payload.match.gameID) else {
             model.setStatus("It is not your turn in this match.")
+            return
+        }
+        guard model.canPlay(payload.match.gameID) else {
+            model.showStore()
+            model.setStatus("Unlock the Premium Game Pack to continue this match.")
             return
         }
 
@@ -223,6 +239,40 @@ final class MessagesViewController: MSMessagesAppViewController {
         }
     }
 
+    private func continueSelectedSeries() {
+        guard let conversation = activeConversation,
+              let payload = model.incomingPayload,
+              payload.match.status == .completed || payload.match.status == .resigned,
+              let series = payload.match.series,
+              !series.completed else {
+            model.setStatus("There is no unfinished series to continue.")
+            return
+        }
+        guard payload.match.createdByPlayerID == model.profile.id else {
+            model.setStatus("The player who started this series sends the next game.")
+            return
+        }
+        guard model.canPlay(payload.match.gameID) else {
+            model.showStore()
+            model.setStatus("Unlock the Premium Game Pack to continue this series.")
+            return
+        }
+
+        do {
+            let match = try PingoMatchReducer.continueSeries(payload.match, actorID: model.profile.id)
+            let continued = PingoMessagePayload(action: .rematch, sender: model.profile, match: match)
+            let session = conversation.selectedMessage?.session ?? MSSession()
+            let message = try PingoMessageFactory.make(payload: continued, session: session)
+            conversation.insert(message)
+            model.incomingPayload = continued
+            model.setStatus("Game \(series.gameNumber) added to the message box — tap Send.")
+        } catch PingoMatchTransitionError.notActorsTurn {
+            model.setStatus("The player who started this series sends the next game.")
+        } catch {
+            model.setStatus("Pingo could not continue this series.")
+        }
+    }
+
     private func insertUpdatedMatch(_ match: PingoMatchEnvelope, conversation: MSConversation) throws {
         let action: PingoMessageAction = match.status == .completed ? .completed : .turn
         let updated = PingoMessagePayload(action: action, sender: model.profile, match: match)
@@ -236,8 +286,7 @@ final class MessagesViewController: MSMessagesAppViewController {
     private func resignSelectedMatch() {
         guard let conversation = activeConversation,
               let payload = model.incomingPayload,
-              payload.match.status == .active
-        else {
+              payload.match.status == .active else {
             model.setStatus("There is no active Pingo match to resign.")
             return
         }

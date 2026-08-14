@@ -11,6 +11,10 @@ actor PingoAPIClient {
         let profile: PingoPublicProfile
     }
 
+    private struct ProgressionResponse: Decodable {
+        let progression: PingoProgressionSnapshot?
+    }
+
     private struct BootstrapRequest: Encodable {
         let playerID: UUID
         let username: String
@@ -20,6 +24,10 @@ actor PingoAPIClient {
     private struct ProfilePatchRequest: Encodable {
         let username: String
         let avatar: PingoAvatar
+    }
+
+    private struct ProgressionRequest: Encodable {
+        let progression: PingoProgressionSnapshot
     }
 
     enum ClientError: Error {
@@ -66,6 +74,27 @@ actor PingoAPIClient {
         request.httpBody = try encoder.encode(requestBody)
         let data = try await perform(request)
         return try decoder.decode(ProfileResponse.self, from: data).profile
+    }
+
+    func loadProgression(token: String) async throws -> PingoProgressionSnapshot? {
+        var request = URLRequest(url: baseURL.appendingPathComponent("progression"))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await perform(request)
+        return try decoder.decode(ProgressionResponse.self, from: data).progression
+    }
+
+    func saveProgression(_ progression: PingoProgressionSnapshot, token: String) async throws -> PingoProgressionSnapshot {
+        var request = URLRequest(url: baseURL.appendingPathComponent("progression"))
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try encoder.encode(ProgressionRequest(progression: progression))
+        let data = try await perform(request)
+        guard let saved = try decoder.decode(ProgressionResponse.self, from: data).progression else {
+            throw ClientError.invalidResponse
+        }
+        return saved
     }
 
     private func perform(_ request: URLRequest) async throws -> Data {
