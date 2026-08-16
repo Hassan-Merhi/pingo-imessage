@@ -11,6 +11,9 @@ on:
         options:
           - Debug
           - Release
+  pull_request:
+    paths:
+      - .github/workflows/iphone-test-ipa.yml
 
 permissions:
   contents: read
@@ -19,6 +22,8 @@ jobs:
   build-test-ipa:
     name: Unsigned iPhone test IPA
     runs-on: macos-latest
+    env:
+      CONFIGURATION: ${{ github.event_name == 'workflow_dispatch' && inputs.configuration || 'Debug' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,11 +37,9 @@ jobs:
         run: xcodegen generate --spec ios/project.yml
 
       - name: Validate privacy manifest
-        run: plutil -lint ios/PingoMessagesExtension/PrivacyInfo.xcprivacy
+        run: plutil -lint ios/Resources/PrivacyInfo.xcprivacy
 
       - name: Build unsigned device app
-        env:
-          CONFIGURATION: ${{ inputs.configuration }}
         run: |
           set -euo pipefail
           rm -rf build/iphone-test
@@ -53,13 +56,12 @@ jobs:
             build
 
       - name: Package IPA for AltServer
-        env:
-          CONFIGURATION: ${{ inputs.configuration }}
         run: |
           set -euo pipefail
           APP_PATH="build/iphone-test/DerivedData/Build/Products/${CONFIGURATION}-iphoneos/Pingo.app"
+          EXTENSION_PATH="$APP_PATH/PlugIns/Pingo Messages.appex"
           test -d "$APP_PATH"
-          test -d "$APP_PATH/PlugIns/PingoMessagesExtension.appex"
+          test -d "$EXTENSION_PATH"
 
           rm -rf build/iphone-test/Payload build/iphone-test/Pingo-Test.ipa
           mkdir -p build/iphone-test/Payload
@@ -70,7 +72,7 @@ jobs:
           (cd build/iphone-test && /usr/bin/zip -qry Pingo-Test.ipa Payload)
 
           test -s build/iphone-test/Pingo-Test.ipa
-          /usr/bin/unzip -l build/iphone-test/Pingo-Test.ipa | grep -q 'Payload/Pingo.app/PlugIns/PingoMessagesExtension.appex/'
+          /usr/bin/unzip -l build/iphone-test/Pingo-Test.ipa | grep -Fq 'Payload/Pingo.app/PlugIns/Pingo Messages.appex/'
 
       - name: Upload Pingo test IPA
         uses: actions/upload-artifact@v4
