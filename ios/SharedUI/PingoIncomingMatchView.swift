@@ -43,7 +43,8 @@ struct PingoIncomingMatchView: View {
         hasPlayableGame
             && localCanPlay
             && localIsPlayer
-            && (payload.match.status == .active
+            && (payload.match.status == .awaitingOpponent
+                || payload.match.status == .active
                 || payload.match.status == .completed
                 || payload.match.status == .resigned)
     }
