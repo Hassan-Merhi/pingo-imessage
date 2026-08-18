@@ -1,0 +1,1 @@
+Cup Pong Phase 2 keeps the existing engine contract intact: `angleDegrees` remains clamped to -30...30 and `power` remains clamped to 0.15...1.0. The new direct table target and flick controls only convert gestures into those existing values; physics behavior is intentionally deferred to Phase 3.
