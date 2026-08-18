@@ -20,6 +20,10 @@ struct PingoImmersiveGameView: View {
         PingoExtraGameEngine.supportedGames.contains(match.gameID)
     }
 
+    private var extraState: PingoExtraGameState? {
+        try? PingoExtraGameEngine.state(from: match.gameState, gameID: match.gameID, matchID: match.id)
+    }
+
     var body: some View {
         ZStack {
             Color.pingoGameBackdrop
@@ -90,6 +94,19 @@ struct PingoImmersiveGameView: View {
                     canMove: localCanMove,
                     onMove: onPhysicsMove
                 )
+
+            case .bowling, .penaltyShootout, .archery, .airHockey, .miniRacing:
+                if let state = extraState {
+                    PingoImmersiveArcadeView(
+                        gameID: match.gameID,
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        onMove: onExtraMove
+                    )
+                } else {
+                    fallbackStage
+                }
 
             default:
                 fallbackStage
