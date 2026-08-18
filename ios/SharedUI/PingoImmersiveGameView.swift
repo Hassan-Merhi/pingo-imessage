@@ -63,7 +63,7 @@ struct PingoImmersiveGameView: View {
 
             case .cupPong:
                 let state = (try? PingoPhysicsGameEngine.cupPongState(from: match.gameState)) ?? PingoCupPongState()
-                PingoCupPongPhase1View(
+                PingoCupPongPhase2View(
                     state: state,
                     player: index,
                     canMove: localCanMove,
