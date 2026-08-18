@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: immersive UI merged 2026-08-18
+# Rebuild marker: 8 Ball Phase 2 validation 2026-08-18
 
 on:
   workflow_dispatch:
