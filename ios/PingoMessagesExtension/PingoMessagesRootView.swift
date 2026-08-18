@@ -17,6 +17,14 @@ struct PingoMessagesRootView: View {
         Group {
             if model.presentationStyle == .compact {
                 PingoCompactHomeView(onOpen: onRequestExpanded)
+                    .onAppear {
+                        // Match the interaction pattern people expect from game-first
+                        // iMessage apps: tapping Pingo should open the actual game browser,
+                        // not leave them stranded on a mostly-empty compact launcher.
+                        Task { @MainActor in
+                            onRequestExpanded()
+                        }
+                    }
             } else {
                 ZStack(alignment: .topTrailing) {
                     if let payload = model.incomingPayload {
