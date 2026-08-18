@@ -12,20 +12,74 @@ enum PingoMessageFactory {
         if let game {
             layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
         }
-        if let series = payload.match.series {
+
+        if payload.match.gameID == .eightBall {
+            configureEightBallTrailing(layout: layout, payload: payload)
+        } else if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
         } else {
             layout.trailingCaption = "Pingo"
             layout.trailingSubcaption = "Turn \(payload.match.turnNumber + 1)"
         }
+
         message.layout = layout
         message.summaryText = summary(for: payload, gameName: game?.name ?? "Pingo")
         message.url = try PingoMessageTransport.makeURL(payload: payload, baseURL: PingoConfiguration.messageBaseURL)
         return message
     }
 
+    private static func configureEightBallTrailing(layout: MSMessageTemplateLayout, payload: PingoMessagePayload) {
+        let state = try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)
+        if let series = payload.match.series {
+            layout.trailingCaption = "8 BALL • \(series.format.title)"
+            layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
+            return
+        }
+
+        switch payload.match.status {
+        case .awaitingOpponent:
+            layout.trailingCaption = "8 BALL"
+            layout.trailingSubcaption = "Challenge"
+        case .active:
+            layout.trailingCaption = state?.groups == [0, 0] ? "OPEN TABLE" : "8 BALL"
+            layout.trailingSubcaption = "Shot \((state?.shotCount ?? payload.match.turnNumber) + 1)"
+        case .completed:
+            layout.trailingCaption = "8 BALL"
+            layout.trailingSubcaption = "Final result"
+        case .resigned:
+            layout.trailingCaption = "8 BALL"
+            layout.trailingSubcaption = "Match ended"
+        case .draft:
+            layout.trailingCaption = "8 BALL"
+            layout.trailingSubcaption = "Preparing"
+        case .expired:
+            layout.trailingCaption = "8 BALL"
+            layout.trailingSubcaption = "Expired"
+        }
+    }
+
     private static func subtitle(for payload: PingoMessagePayload) -> String {
+        if payload.match.gameID == .eightBall {
+            switch payload.action {
+            case .challenge:
+                if let series = payload.match.series {
+                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
+                }
+                return "@\(payload.sender.username) challenged you to 8 Ball"
+            case .accepted:
+                return "Table ready • @\(payload.sender.username) joined"
+            case .turn:
+                return "Shot sent • open the table"
+            case .resigned:
+                return "@\(payload.sender.username) ended the match"
+            case .completed:
+                return payload.match.series?.completed == true ? "Series complete • see the result" : "Rack complete • see the result"
+            case .rematch:
+                return "New rack ready"
+            }
+        }
+
         switch payload.action {
         case .challenge:
             if let series = payload.match.series {
