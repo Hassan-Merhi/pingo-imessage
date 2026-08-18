@@ -38,7 +38,7 @@ struct PingoImmersiveGameView: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
 
-            if match.status == .active && !localCanMove {
+            if match.status == .awaitingOpponent || (match.status == .active && !localCanMove) {
                 waitingOverlay
             }
         }
@@ -188,14 +188,14 @@ struct PingoImmersiveGameView: View {
     }
 
     private var waitingOverlay: some View {
-        Text("WAITING FOR OPPONENT.")
+        Text(match.status == .awaitingOpponent ? "WAITING FOR OPPONENT." : "OPPONENT'S TURN.")
             .font(.system(size: 18, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .padding(.horizontal, 28)
             .padding(.vertical, 15)
             .background(Color.pingoGameOverlay, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .shadow(radius: 8, y: 4)
-            .accessibilityLabel("Waiting for opponent")
+            .accessibilityLabel(match.status == .awaitingOpponent ? "Waiting for opponent" : "Opponent's turn")
     }
 }
 
