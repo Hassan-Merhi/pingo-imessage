@@ -2,15 +2,6 @@ name: Build iPhone Test IPA
 
 on:
   workflow_dispatch:
-    inputs:
-      configuration:
-        description: Build configuration
-        required: true
-        default: Debug
-        type: choice
-        options:
-          - Debug
-          - Release
   pull_request:
     paths:
       - .github/workflows/iphone-test-ipa.yml
@@ -20,10 +11,8 @@ permissions:
 
 jobs:
   build-test-ipa:
-    name: Unsigned iPhone test IPA
+    name: Sideload-safe iPhone test IPA
     runs-on: macos-latest
-    env:
-      CONFIGURATION: ${{ github.event_name == 'workflow_dispatch' && inputs.configuration || 'Debug' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,14 +28,14 @@ jobs:
       - name: Validate privacy manifest
         run: plutil -lint ios/Resources/PrivacyInfo.xcprivacy
 
-      - name: Build unsigned device app
+      - name: Build unsigned Release device app
         run: |
           set -euo pipefail
           rm -rf build/iphone-test
           xcodebuild \
             -project ios/Pingo.xcodeproj \
             -scheme Pingo \
-            -configuration "$CONFIGURATION" \
+            -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/iphone-test/DerivedData \
@@ -55,29 +44,48 @@ jobs:
             CODE_SIGN_IDENTITY='' \
             build
 
-      - name: Package IPA for AltServer
+      - name: Validate sideload-safe bundle layout
         run: |
           set -euo pipefail
-          APP_PATH="build/iphone-test/DerivedData/Build/Products/${CONFIGURATION}-iphoneos/Pingo.app"
+          APP_PATH="build/iphone-test/DerivedData/Build/Products/Release-iphoneos/Pingo.app"
           EXTENSION_PATH="$APP_PATH/PlugIns/Pingo Messages.appex"
           test -d "$APP_PATH"
           test -d "$EXTENSION_PATH"
 
-          rm -rf build/iphone-test/Payload build/iphone-test/Pingo-Test.ipa
+          # Xcode's unoptimized Debug layout puts executable code in *.debug.dylib
+          # plus __preview.dylib. Some third-party re-signers do not recursively
+          # re-sign those loader dylibs correctly, leaving Messages with a blank host.
+          if find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) | grep -q .; then
+            echo "Unexpected Xcode debug-loader dylib found in sideload artifact:" >&2
+            find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) >&2
+            exit 1
+          fi
+
+          /usr/bin/file "$APP_PATH/Pingo" | grep -q 'arm64'
+          /usr/bin/file "$EXTENSION_PATH/Pingo Messages" | grep -q 'arm64'
+          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPrincipalClass' "$EXTENSION_PATH/Info.plist" | grep -Fq 'Pingo_Messages.MessagesViewController'
+
+      - name: Package IPA for personal signing
+        run: |
+          set -euo pipefail
+          APP_PATH="build/iphone-test/DerivedData/Build/Products/Release-iphoneos/Pingo.app"
+
+          rm -rf build/iphone-test/Payload build/iphone-test/Pingo-Test-Release.ipa
           mkdir -p build/iphone-test/Payload
           cp -R "$APP_PATH" build/iphone-test/Payload/Pingo.app
 
-          # This IPA is intentionally unsigned. AltServer/AltStore will apply the
-          # user's personal-development signature and provisioning profile later.
-          (cd build/iphone-test && /usr/bin/zip -qry Pingo-Test.ipa Payload)
+          # Intentionally unsigned. A sideloading tool applies the user's personal
+          # development certificate/profile to the app and embedded Messages extension.
+          (cd build/iphone-test && /usr/bin/zip -qry Pingo-Test-Release.ipa Payload)
 
-          test -s build/iphone-test/Pingo-Test.ipa
-          /usr/bin/unzip -l build/iphone-test/Pingo-Test.ipa | grep -Fq 'Payload/Pingo.app/PlugIns/Pingo Messages.appex/'
+          test -s build/iphone-test/Pingo-Test-Release.ipa
+          /usr/bin/unzip -l build/iphone-test/Pingo-Test-Release.ipa | grep -Fq 'Payload/Pingo.app/PlugIns/Pingo Messages.appex/'
+          ! /usr/bin/unzip -l build/iphone-test/Pingo-Test-Release.ipa | grep -E '\.debug\.dylib|__preview\.dylib'
 
       - name: Upload Pingo test IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Pingo-Test-IPA-${{ github.run_number }}
-          path: build/iphone-test/Pingo-Test.ipa
+          name: Pingo-Test-Release-IPA-${{ github.run_number }}
+          path: build/iphone-test/Pingo-Test-Release.ipa
           if-no-files-found: error
           retention-days: 14
