@@ -11,20 +11,21 @@ enum PingoMessagePreviewRenderer {
         return UIGraphicsImageRenderer(size: size, format: format).image { renderer in
             let context = renderer.cgContext
             drawBackground(in: context, size: size, game: game)
-            drawGameArtwork(in: context, size: size, game: game)
+            drawGameArtwork(in: context, size: size, game: game, payload: payload)
             drawLabels(size: size, game: game, payload: payload)
         }
     }
 
     private static func drawBackground(in context: CGContext, size: CGSize, game: PingoGameDescriptor) {
-        let colors = palette(for: game).map { $0.cgColor } as CFArray
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let locations: [CGFloat] = [0, 1]
-        let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations)
+        let colors = palette(for: game).map(\.cgColor) as CFArray
+        let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors,
+            locations: [0, 1]
+        )
 
         context.saveGState()
-        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 34)
-        path.addClip()
+        UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 34).addClip()
         if let gradient {
             context.drawLinearGradient(
                 gradient,
@@ -33,22 +34,24 @@ enum PingoMessagePreviewRenderer {
                 options: []
             )
         }
-
-        context.setFillColor(UIColor.black.withAlphaComponent(0.16).cgColor)
-        context.fill(CGRect(x: 0, y: size.height - 92, width: size.width, height: 92))
+        context.setFillColor(UIColor.black.withAlphaComponent(0.19).cgColor)
+        context.fill(CGRect(x: 0, y: size.height - 94, width: size.width, height: 94))
         context.restoreGState()
     }
 
-    private static func drawGameArtwork(in context: CGContext, size: CGSize, game: PingoGameDescriptor) {
+    private static func drawGameArtwork(
+        in context: CGContext,
+        size: CGSize,
+        game: PingoGameDescriptor,
+        payload: PingoMessagePayload
+    ) {
         if game.id == .eightBall {
-            drawEightBallTable(in: context, size: size)
+            drawEightBallTable(in: context, size: size, payload: payload)
             return
         }
 
         let emoji = game.symbol as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 126)
-        ]
+        let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 126)]
         let emojiSize = emoji.size(withAttributes: attributes)
         emoji.draw(
             at: CGPoint(x: (size.width - emojiSize.width) / 2, y: 50),
@@ -56,77 +59,181 @@ enum PingoMessagePreviewRenderer {
         )
     }
 
-    private static func drawEightBallTable(in context: CGContext, size: CGSize) {
-        let tableRect = CGRect(x: 82, y: 38, width: size.width - 164, height: 214)
-        let rail = UIBezierPath(roundedRect: tableRect, cornerRadius: 24)
-        UIColor(red: 0.34, green: 0.15, blue: 0.13, alpha: 1).setFill()
-        rail.fill()
+    private static func drawEightBallTable(in context: CGContext, size: CGSize, payload: PingoMessagePayload) {
+        let tableRect = CGRect(x: 58, y: 24, width: size.width - 116, height: 236)
 
-        let feltRect = tableRect.insetBy(dx: 18, dy: 18)
-        let felt = UIBezierPath(roundedRect: feltRect, cornerRadius: 15)
-        UIColor(red: 0.02, green: 0.50, blue: 0.44, alpha: 1).setFill()
-        felt.fill()
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: 8), blur: 14, color: UIColor.black.withAlphaComponent(0.36).cgColor)
+        UIColor(red: 0.22, green: 0.09, blue: 0.075, alpha: 1).setFill()
+        UIBezierPath(roundedRect: tableRect, cornerRadius: 30).fill()
+        context.restoreGState()
+
+        let innerRail = tableRect.insetBy(dx: 9, dy: 9)
+        UIColor(red: 0.47, green: 0.22, blue: 0.16, alpha: 1).setFill()
+        UIBezierPath(roundedRect: innerRail, cornerRadius: 23).fill()
+
+        let feltRect = tableRect.insetBy(dx: 25, dy: 25)
+        UIColor(red: 0.015, green: 0.43, blue: 0.37, alpha: 1).setFill()
+        UIBezierPath(roundedRect: feltRect, cornerRadius: 15).fill()
+
+        UIColor.white.withAlphaComponent(0.08).setStroke()
+        let feltStroke = UIBezierPath(roundedRect: feltRect.insetBy(dx: 2, dy: 2), cornerRadius: 13)
+        feltStroke.lineWidth = 2
+        feltStroke.stroke()
 
         let pocketCenters = [
             CGPoint(x: feltRect.minX, y: feltRect.minY),
-            CGPoint(x: feltRect.midX, y: feltRect.minY),
+            CGPoint(x: feltRect.midX, y: feltRect.minY - 1),
             CGPoint(x: feltRect.maxX, y: feltRect.minY),
             CGPoint(x: feltRect.minX, y: feltRect.maxY),
-            CGPoint(x: feltRect.midX, y: feltRect.maxY),
+            CGPoint(x: feltRect.midX, y: feltRect.maxY + 1),
             CGPoint(x: feltRect.maxX, y: feltRect.maxY)
         ]
         UIColor.black.setFill()
         for center in pocketCenters {
-            context.fillEllipse(in: CGRect(x: center.x - 10, y: center.y - 10, width: 20, height: 20))
+            context.fillEllipse(in: CGRect(x: center.x - 12, y: center.y - 12, width: 24, height: 24))
         }
 
-        UIColor.white.setFill()
-        context.fillEllipse(in: CGRect(x: feltRect.minX + 72, y: feltRect.midY - 9, width: 18, height: 18))
+        let cueCenter = CGPoint(x: feltRect.minX + 102, y: feltRect.midY)
+        drawAimLine(in: context, from: cueCenter, to: CGPoint(x: feltRect.midX + 58, y: feltRect.midY - 15))
+        drawBall(in: context, center: cueCenter, radius: 11, color: .white, number: nil)
 
-        let rackOrigin = CGPoint(x: feltRect.maxX - 112, y: feltRect.midY - 35)
-        let colors: [UIColor] = [.systemYellow, .systemBlue, .systemRed, .systemPurple, .systemOrange, .systemGreen, .black]
-        var index = 0
+        let rackOrigin = CGPoint(x: feltRect.maxX - 132, y: feltRect.midY)
+        let rack: [(UIColor, Int)] = [
+            (.systemYellow, 1), (.systemBlue, 2), (.systemRed, 3), (.systemPurple, 4),
+            (.black, 8), (.systemOrange, 5), (.systemGreen, 6), (.systemRed, 11),
+            (.systemBlue, 10), (.systemYellow, 9), (.systemOrange, 13), (.systemPurple, 12),
+            (.systemGreen, 14), (.systemRed, 7), (.systemBlue, 15)
+        ]
+        var rackIndex = 0
         for row in 0..<5 {
             for column in 0...row {
-                let x = rackOrigin.x + CGFloat(row) * 15
-                let y = rackOrigin.y + CGFloat(column) * 15 - CGFloat(row) * 7.5
-                colors[index % colors.count].setFill()
-                context.fillEllipse(in: CGRect(x: x, y: y, width: 14, height: 14))
-                index += 1
+                let center = CGPoint(
+                    x: rackOrigin.x + CGFloat(row) * 17,
+                    y: rackOrigin.y + (CGFloat(column) - CGFloat(row) / 2) * 17
+                )
+                let item = rack[rackIndex]
+                drawBall(in: context, center: center, radius: 8, color: item.0, number: item.1)
+                rackIndex += 1
             }
         }
+
+        drawEightBallStatusBadge(in: context, size: size, payload: payload)
+    }
+
+    private static func drawAimLine(in context: CGContext, from start: CGPoint, to end: CGPoint) {
+        context.saveGState()
+        context.setStrokeColor(UIColor.white.withAlphaComponent(0.48).cgColor)
+        context.setLineWidth(2)
+        context.setLineDash(phase: 0, lengths: [7, 7])
+        context.move(to: start)
+        context.addLine(to: end)
+        context.strokePath()
+        context.restoreGState()
+    }
+
+    private static func drawBall(
+        in context: CGContext,
+        center: CGPoint,
+        radius: CGFloat,
+        color: UIColor,
+        number: Int?
+    ) {
+        let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: 2), blur: 3, color: UIColor.black.withAlphaComponent(0.34).cgColor)
+        color.setFill()
+        context.fillEllipse(in: rect)
+        context.restoreGState()
+
+        guard let number else { return }
+        let dotRadius = max(4, radius * 0.58)
+        UIColor.white.setFill()
+        context.fillEllipse(in: CGRect(x: center.x - dotRadius, y: center.y - dotRadius, width: dotRadius * 2, height: dotRadius * 2))
+        let text = "\(number)" as NSString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: max(6, radius * 0.9), weight: .bold),
+            .foregroundColor: UIColor.black
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        text.draw(at: CGPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2), withAttributes: attributes)
+    }
+
+    private static func drawEightBallStatusBadge(in context: CGContext, size: CGSize, payload: PingoMessagePayload) {
+        let text = eightBallStatus(for: payload) as NSString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 16, weight: .heavy),
+            .foregroundColor: UIColor.white
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        let badge = CGRect(x: size.width - textSize.width - 64, y: 40, width: textSize.width + 28, height: 32)
+        UIColor.black.withAlphaComponent(0.66).setFill()
+        UIBezierPath(roundedRect: badge, cornerRadius: 16).fill()
+        text.draw(at: CGPoint(x: badge.minX + 14, y: badge.midY - textSize.height / 2), withAttributes: attributes)
     }
 
     private static func drawLabels(size: CGSize, game: PingoGameDescriptor, payload: PingoMessagePayload) {
-        let title = game.name as NSString
+        let title = (game.id == .eightBall ? "8 BALL" : game.name) as NSString
         title.draw(
-            at: CGPoint(x: 28, y: size.height - 77),
+            at: CGPoint(x: 28, y: size.height - 78),
             withAttributes: [
-                .font: UIFont.systemFont(ofSize: 30, weight: .bold),
+                .font: UIFont.systemFont(ofSize: 29, weight: .heavy),
                 .foregroundColor: UIColor.white
             ]
         )
 
-        let action = actionText(for: payload) as NSString
-        let actionAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 19, weight: .semibold),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.72)
-        ]
-        let actionSize = action.size(withAttributes: actionAttributes)
-        action.draw(
-            at: CGPoint(x: size.width - actionSize.width - 28, y: size.height - 70),
-            withAttributes: actionAttributes
+        let detail = detailText(for: payload, game: game) as NSString
+        detail.draw(
+            at: CGPoint(x: 29, y: size.height - 43),
+            withAttributes: [
+                .font: UIFont.systemFont(ofSize: 15, weight: .semibold),
+                .foregroundColor: UIColor.white.withAlphaComponent(0.62)
+            ]
         )
+
+        let action = actionText(for: payload) as NSString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 18, weight: .bold),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.84)
+        ]
+        let actionSize = action.size(withAttributes: attributes)
+        action.draw(
+            at: CGPoint(x: size.width - actionSize.width - 28, y: size.height - 64),
+            withAttributes: attributes
+        )
+    }
+
+    private static func eightBallStatus(for payload: PingoMessagePayload) -> String {
+        switch payload.action {
+        case .challenge: return "CHALLENGE"
+        case .accepted: return "BREAK READY"
+        case .turn: return "SHOT \(payload.match.turnNumber + 1)"
+        case .resigned: return "ENDED"
+        case .completed: return "FINAL"
+        case .rematch: return "REMATCH"
+        }
+    }
+
+    private static func detailText(for payload: PingoMessagePayload, game: PingoGameDescriptor) -> String {
+        guard game.id == .eightBall else { return "@\(payload.sender.username)" }
+        switch payload.action {
+        case .challenge: return "@\(payload.sender.username) wants to play"
+        case .accepted: return "Table ready • take the first shot"
+        case .turn: return "@\(payload.sender.username) sent the table back"
+        case .resigned: return "Match ended"
+        case .completed: return payload.match.series?.completed == true ? "Series complete" : "Match complete"
+        case .rematch: return "New table ready"
+        }
     }
 
     private static func actionText(for payload: PingoMessagePayload) -> String {
         switch payload.action {
-        case .challenge: return "LET'S PLAY"
-        case .accepted: return "READY"
+        case .challenge: return "TAP TO PLAY"
+        case .accepted: return "OPEN TABLE"
         case .turn: return "YOUR MOVE"
-        case .resigned: return "MATCH ENDED"
-        case .completed: return "RESULT"
-        case .rematch: return "NEXT GAME"
+        case .resigned: return "VIEW RESULT"
+        case .completed: return "VIEW RESULT"
+        case .rematch: return "PLAY AGAIN"
         }
     }
 
