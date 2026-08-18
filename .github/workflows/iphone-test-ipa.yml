@@ -1,5 +1,6 @@
 name: Build iPhone Test IPA
 # Rebuild marker: immersive UI merged 2026-08-18
+# Artifact retrieval marker: 2026-08-18T10:58Z
 
 on:
   workflow_dispatch:
