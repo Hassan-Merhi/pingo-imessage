@@ -22,6 +22,14 @@ struct PingoIncomingMatchView: View {
         payload.match.players.contains(where: { $0.id == localProfile.id })
     }
 
+    private var localPlayerIndex: Int? {
+        payload.match.players.firstIndex(where: { $0.id == localProfile.id })
+    }
+
+    private var localCanMove: Bool {
+        payload.match.status == .active && payload.match.currentPlayerID == localProfile.id
+    }
+
     private var hasPlayableGame: Bool {
         PingoPlayableGameRegistry.supportedGames.contains(payload.match.gameID)
             || PingoExtraGameEngine.supportedGames.contains(payload.match.gameID)
@@ -54,14 +62,39 @@ struct PingoIncomingMatchView: View {
             Color.pingoGameBackdrop.ignoresSafeArea()
 
             if shouldShowGame {
-                PingoImmersiveGameView(
-                    match: payload.match,
-                    localProfile: localProfile,
-                    onMoves: onMoves,
-                    onPhysicsMove: onPhysicsMove,
-                    onExtraMove: onExtraMove
-                )
-                .padding(.top, 66)
+                if payload.match.gameID == .eightBall, let index = localPlayerIndex {
+                    let state = (try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)) ?? PingoEightBallState()
+                    ZStack {
+                        PingoEightBallPhase1View(
+                            state: state,
+                            player: index,
+                            canMove: localCanMove,
+                            match: payload.match,
+                            localProfile: localProfile,
+                            onMove: onPhysicsMove
+                        )
+
+                        if payload.match.status == .awaitingOpponent || (payload.match.status == .active && !localCanMove) {
+                            Text(payload.match.status == .awaitingOpponent ? "WAITING FOR OPPONENT." : "OPPONENT'S TURN.")
+                                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 28)
+                                .padding(.vertical, 15)
+                                .background(Color.pingoGameOverlay, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                .shadow(radius: 8, y: 4)
+                        }
+                    }
+                    .padding(.top, 66)
+                } else {
+                    PingoImmersiveGameView(
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMoves: onMoves,
+                        onPhysicsMove: onPhysicsMove,
+                        onExtraMove: onExtraMove
+                    )
+                    .padding(.top, 66)
+                }
             } else {
                 nonGameState
                     .padding(.top, 66)
