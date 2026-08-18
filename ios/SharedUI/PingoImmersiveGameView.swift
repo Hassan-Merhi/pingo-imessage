@@ -139,10 +139,12 @@ struct PingoImmersiveGameView: View {
             }
             .preferredColorScheme(.light)
         } else {
-            PingoBoardGameView(match: match, localProfile: localProfile, onMoves: onMoves)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 14)
-                .preferredColorScheme(.light)
+            PingoImmersiveBoardStage(
+                match: match,
+                localProfile: localProfile,
+                onMoves: onMoves
+            )
+            .preferredColorScheme(.light)
         }
     }
 
