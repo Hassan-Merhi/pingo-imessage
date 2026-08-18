@@ -1,6 +1,7 @@
 import PingoCore
 import UIKit
 
+@MainActor
 enum PingoMessagePreviewRenderer {
     static func image(for game: PingoGameDescriptor, payload: PingoMessagePayload) -> UIImage {
         let size = CGSize(width: 640, height: 360)
