@@ -41,12 +41,14 @@ struct PingoMessagesRootView: View {
                             onOpenStore: model.showStore,
                             onClose: model.clearIncomingMatch
                         )
+                        .transition(.opacity.combined(with: .scale(scale: 0.985)))
                     } else {
                         PingoHomeView(
                             progression: model.progression,
                             onChallenge: onChallenge,
                             onOpenStore: model.showStore
                         )
+                        .transition(.opacity)
 
                         homeToolbar
                     }
@@ -77,6 +79,7 @@ struct PingoMessagesRootView: View {
             )
         }
         .animation(.easeInOut(duration: 0.2), value: model.presentationStyle)
+        .animation(.easeOut(duration: 0.18), value: model.incomingPayload?.match.revision)
     }
 
     private var homeToolbar: some View {
