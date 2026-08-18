@@ -31,6 +31,17 @@ struct PingoEightBallPhase4View: View {
         state.groups.count == 2 && state.groups != [0, 0]
     }
 
+    private var feedbackSignature: String {
+        [
+            String(describing: match.status),
+            match.currentPlayerID?.uuidString ?? "none",
+            String(state.shotCount),
+            state.lastScratch ? "scratch" : "clean",
+            state.lastPocketed.map(String.init).joined(separator: ","),
+            match.winnerPlayerID?.uuidString ?? "none"
+        ].joined(separator: "|")
+    }
+
     var body: some View {
         ZStack {
             PingoEightBallPhase3View(
@@ -39,7 +50,7 @@ struct PingoEightBallPhase4View: View {
                 canMove: canMove && match.status == .active,
                 match: match,
                 localProfile: localProfile,
-                onMove: onMove
+                onMove: handleMove
             )
 
             VStack(spacing: 0) {
@@ -79,6 +90,15 @@ struct PingoEightBallPhase4View: View {
                 resultState
             }
         }
+        .onAppear {
+            PingoEightBallFeedback.prepare()
+            if match.status == .active && canMove {
+                PingoEightBallFeedback.turnReady()
+            }
+        }
+        .onChange(of: feedbackSignature) { _ in
+            playStateFeedback()
+        }
         .confirmationDialog(
             "Resign this 8 Ball match?",
             isPresented: $showResignConfirmation,
@@ -88,6 +108,26 @@ struct PingoEightBallPhase4View: View {
             Button("Keep Playing", role: .cancel) {}
         } message: {
             Text("The other player will be awarded the match.")
+        }
+    }
+
+    private func handleMove(_ move: PingoPhysicsMove) {
+        PingoEightBallFeedback.shotReleased()
+        onMove(move)
+    }
+
+    private func playStateFeedback() {
+        if match.status == .completed || match.status == .resigned {
+            PingoEightBallFeedback.matchFinished(won: localWon)
+            return
+        }
+        if state.lastScratch {
+            PingoEightBallFeedback.scratch()
+        } else if !state.lastPocketed.isEmpty {
+            PingoEightBallFeedback.ballPocketed()
+        }
+        if match.status == .active && canMove {
+            PingoEightBallFeedback.turnReady()
         }
     }
 
