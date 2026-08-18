@@ -18,61 +18,35 @@ struct PingoMessagesRootView: View {
             if model.presentationStyle == .compact {
                 PingoCompactHomeView(onOpen: onRequestExpanded)
             } else {
-                NavigationStack {
-                    Group {
-                        if let payload = model.incomingPayload {
-                            PingoIncomingMatchView(
-                                payload: payload,
-                                localProfile: model.profile,
-                                entitlements: model.progression.entitlements,
-                                onAccept: onAccept,
-                                onMoves: onMoves,
-                                onPhysicsMove: onPhysicsMove,
-                                onExtraMove: onExtraMove,
-                                onContinueSeries: onContinueSeries,
-                                onResign: onResign,
-                                onOpenStore: model.showStore,
-                                onClose: model.clearIncomingMatch
-                            )
-                        } else {
-                            PingoHomeView(
-                                progression: model.progression,
-                                onChallenge: onChallenge,
-                                onOpenStore: model.showStore
-                            )
-                        }
-                    }
-                    .navigationTitle("Pingo")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItemGroup(placement: .topBarTrailing) {
-                            Button {
-                                model.showStore()
-                            } label: {
-                                Image(systemName: "bag")
-                            }
-                            .accessibilityLabel("Pingo store")
+                ZStack(alignment: .topTrailing) {
+                    if let payload = model.incomingPayload {
+                        PingoIncomingMatchView(
+                            payload: payload,
+                            localProfile: model.profile,
+                            entitlements: model.progression.entitlements,
+                            onAccept: onAccept,
+                            onMoves: onMoves,
+                            onPhysicsMove: onPhysicsMove,
+                            onExtraMove: onExtraMove,
+                            onContinueSeries: onContinueSeries,
+                            onResign: onResign,
+                            onOpenStore: model.showStore,
+                            onClose: model.clearIncomingMatch
+                        )
+                    } else {
+                        PingoHomeView(
+                            progression: model.progression,
+                            onChallenge: onChallenge,
+                            onOpenStore: model.showStore
+                        )
 
-                            Button {
-                                model.isProfilePresented = true
-                            } label: {
-                                Image(systemName: "person.crop.circle")
-                            }
-                            .accessibilityLabel("Pingo profile")
-                        }
+                        homeToolbar
+                    }
+
+                    if let status = model.statusMessage {
+                        statusToast(status)
                     }
                 }
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if let status = model.statusMessage, model.presentationStyle == .expanded {
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(.ultraThinMaterial)
             }
         }
         .sheet(isPresented: $model.isProfilePresented) {
@@ -95,5 +69,53 @@ struct PingoMessagesRootView: View {
             )
         }
         .animation(.easeInOut(duration: 0.2), value: model.presentationStyle)
+    }
+
+    private var homeToolbar: some View {
+        HStack(spacing: 8) {
+            Button {
+                model.showStore()
+            } label: {
+                Image(systemName: "bag")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(.white.opacity(0.10), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Pingo store")
+
+            Button {
+                model.isProfilePresented = true
+            } label: {
+                Image(systemName: "person.crop.circle")
+                    .font(.title3)
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(.white.opacity(0.10), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Pingo profile")
+        }
+        .padding(.top, 18)
+        .padding(.trailing, 16)
+    }
+
+    private func statusToast(_ status: String) -> some View {
+        VStack {
+            Spacer()
+            Text(status)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(.black.opacity(0.76), in: Capsule())
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 }
