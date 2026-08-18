@@ -1,5 +1,6 @@
 import PingoCore
 import SwiftUI
+import UIKit
 
 struct PingoEightBallPhase4View: View {
     let state: PingoEightBallState
@@ -39,7 +40,10 @@ struct PingoEightBallPhase4View: View {
                 canMove: canMove && match.status == .active,
                 match: match,
                 localProfile: localProfile,
-                onMove: onMove
+                onMove: { move in
+                    PingoEightBallFeedback.shotCommitted()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -79,12 +83,32 @@ struct PingoEightBallPhase4View: View {
                 resultState
             }
         }
+        .onAppear {
+            if match.status == .active && canMove {
+                PingoEightBallFeedback.turnReady()
+            } else if match.status == .completed {
+                PingoEightBallFeedback.result(won: localWon)
+            }
+        }
+        .onChange(of: canMove) { newValue in
+            if newValue && match.status == .active {
+                PingoEightBallFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { newValue in
+            if newValue == .completed {
+                PingoEightBallFeedback.result(won: localWon)
+            }
+        }
         .confirmationDialog(
             "Resign this 8 Ball match?",
             isPresented: $showResignConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Resign Match", role: .destructive, action: onResign)
+            Button("Resign Match", role: .destructive) {
+                PingoEightBallFeedback.destructiveAction()
+                onResign()
+            }
             Button("Keep Playing", role: .cancel) {}
         } message: {
             Text("The other player will be awarded the match.")
@@ -112,6 +136,7 @@ struct PingoEightBallPhase4View: View {
                 }
 
                 Button {
+                    PingoEightBallFeedback.selection()
                     showResignConfirmation = true
                 } label: {
                     Image(systemName: "flag.fill")
@@ -234,11 +259,17 @@ struct PingoEightBallPhase4View: View {
 
             HStack(spacing: 9) {
                 if canContinueSeries {
-                    Button("Next Game", action: onContinueSeries)
-                        .buttonStyle(Phase4PrimaryButtonStyle())
+                    Button("Next Game") {
+                        PingoEightBallFeedback.selection()
+                        onContinueSeries()
+                    }
+                    .buttonStyle(Phase4PrimaryButtonStyle())
                 } else {
-                    Button("Rematch", action: onRematch)
-                        .buttonStyle(Phase4PrimaryButtonStyle())
+                    Button("Rematch") {
+                        PingoEightBallFeedback.selection()
+                        onRematch()
+                    }
+                    .buttonStyle(Phase4PrimaryButtonStyle())
                 }
             }
         }
@@ -257,6 +288,29 @@ struct PingoEightBallPhase4View: View {
             return localWon ? "Opponent resigned" : "Match resigned"
         }
         return localWon ? "Table cleared" : "Opponent cleared the table"
+    }
+}
+
+@MainActor
+private enum PingoEightBallFeedback {
+    static func shotCommitted() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    static func turnReady() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    static func result(won: Bool) {
+        UINotificationFeedbackGenerator().notificationOccurred(won ? .success : .warning)
+    }
+
+    static func destructiveAction() {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+    }
+
+    static func selection() {
+        UISelectionFeedbackGenerator().selectionChanged()
     }
 }
 

@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: 8 Ball Phase 4 validation 2026-08-18
+# Rebuild marker: 8 Ball Phase 5 validation 2026-08-18
 
 on:
   workflow_dispatch:
