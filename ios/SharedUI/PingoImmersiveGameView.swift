@@ -20,10 +20,6 @@ struct PingoImmersiveGameView: View {
         PingoExtraGameEngine.supportedGames.contains(match.gameID)
     }
 
-    private var isPhysicsGame: Bool {
-        PingoPhysicsGameEngine.supportedGames.contains(match.gameID)
-    }
-
     var body: some View {
         ZStack {
             Color.pingoGameBackdrop
@@ -47,35 +43,76 @@ struct PingoImmersiveGameView: View {
 
     @ViewBuilder
     private var gameStage: some View {
-        if match.gameID == .eightBall,
-           let index = localPlayerIndex {
-            let state = (try? PingoPhysicsGameEngine.eightBallState(from: match.gameState)) ?? PingoEightBallState()
-            PingoImmersiveEightBallView(
-                state: state,
-                player: index,
-                canMove: localCanMove,
-                onMove: onPhysicsMove
-            )
-            .padding(.horizontal, 8)
-        } else if isExtraGame {
+        if let index = localPlayerIndex {
+            switch match.gameID {
+            case .eightBall:
+                let state = (try? PingoPhysicsGameEngine.eightBallState(from: match.gameState)) ?? PingoEightBallState()
+                PingoImmersiveEightBallView(
+                    state: state,
+                    player: index,
+                    canMove: localCanMove,
+                    onMove: onPhysicsMove
+                )
+                .padding(.horizontal, 8)
+
+            case .cupPong:
+                let state = (try? PingoPhysicsGameEngine.cupPongState(from: match.gameState)) ?? PingoCupPongState()
+                PingoImmersiveCupPongView(
+                    state: state,
+                    player: index,
+                    canMove: localCanMove,
+                    onMove: onPhysicsMove
+                )
+
+            case .basketball:
+                let state = (try? PingoPhysicsGameEngine.basketballState(from: match.gameState)) ?? PingoBasketballState()
+                PingoImmersiveBasketballView(
+                    state: state,
+                    player: index,
+                    canMove: localCanMove,
+                    onMove: onPhysicsMove
+                )
+
+            case .darts:
+                let state = (try? PingoPhysicsGameEngine.dartsState(from: match.gameState)) ?? PingoDartsState()
+                PingoImmersiveDartsView(
+                    state: state,
+                    player: index,
+                    canMove: localCanMove,
+                    onMove: onPhysicsMove
+                )
+
+            case .miniGolf:
+                let state = (try? PingoPhysicsGameEngine.miniGolfState(from: match.gameState)) ?? PingoMiniGolfState()
+                PingoImmersiveMiniGolfView(
+                    state: state,
+                    player: index,
+                    canMove: localCanMove,
+                    onMove: onPhysicsMove
+                )
+
+            default:
+                fallbackStage
+            }
+        } else {
+            fallbackStage
+        }
+    }
+
+    @ViewBuilder
+    private var fallbackStage: some View {
+        if isExtraGame {
             ScrollView(showsIndicators: false) {
                 PingoExtraGameView(match: match, localProfile: localProfile, onMove: onExtraMove)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
             }
-            .preferredColorScheme(.dark)
-        } else if isPhysicsGame {
-            ScrollView(showsIndicators: false) {
-                PingoPhysicsGameView(match: match, localProfile: localProfile, onMove: onPhysicsMove)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-            }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
         } else {
             PingoBoardGameView(match: match, localProfile: localProfile, onMoves: onMoves)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 14)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
     }
 
