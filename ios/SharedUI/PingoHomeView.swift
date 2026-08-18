@@ -9,32 +9,40 @@ struct PingoHomeView: View {
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                hero
-                quickPlay
-                Text("Original Collection")
-                    .font(.headline)
-                gameGrid(Array(PingoGameCatalog.launch.prefix(10)))
-                Text("Wave 6 Expansions")
-                    .font(.headline)
-                    .padding(.top, 2)
-                gameGrid(PingoGameCatalog.wave6)
-                footer
+        ZStack {
+            Color.pingoMessagesChrome.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+
+                    Text("GAMES")
+                        .font(.caption.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.52))
+
+                    gameGrid(PingoGameCatalog.launch)
+
+                    footer
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .padding(.bottom, 34)
             }
-            .padding(16)
         }
-        .background(Color.pingoSurface.ignoresSafeArea())
         .sheet(item: $selectedGame) { game in
             ChallengeGameView(game: game) { format in
                 onChallenge(game.id, format)
                 selectedGame = nil
             }
+            .preferredColorScheme(.dark)
         }
+        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder
@@ -56,51 +64,26 @@ struct PingoHomeView: View {
         }
     }
 
-    private var hero: some View {
+    private var header: some View {
         HStack(spacing: 12) {
-            PingoMark(size: 54)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Pick a game")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Color.pingoInk)
-                Text("Level \(progression.level) • \(progression.xp) XP")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.pingoPrimary)
-                ProgressView(value: Double(progression.xpIntoLevel), total: Double(PingoProgression.xpPerLevel))
-                    .tint(.pingoPrimary)
-                Text("Challenge someone in this chat.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            PingoMark(size: 48)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pingo")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("Level \(progression.level)  •  \(progression.xp) XP")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.54))
             }
+            Spacer()
         }
-    }
-
-    private var quickPlay: some View {
-        HStack(spacing: 10) {
-            Button {
-                let seed = UInt64.random(in: UInt64.min...UInt64.max)
-                guard let gameID = PingoRandomGame.pick(entitlements: progression.entitlements, seed: seed),
-                      let game = PingoGameCatalog.game(id: gameID) else { return }
-                selectedGame = game
-            } label: {
-                Label("Random Game", systemImage: "shuffle")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.pingoPrimary)
-
-            Button(action: onOpenStore) {
-                Label("Store", systemImage: "bag")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-        }
+        .padding(.trailing, 92)
     }
 
     private var footer: some View {
-        Text("22 games • 5 free • 4 one-time game packs • Single, Best of 3 & Best of 5")
+        Text("Pick a game, choose a match format, then send the challenge into this conversation.")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.46))
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
             .padding(.top, 4)
@@ -112,37 +95,45 @@ private struct GameTile: View {
     let unlocked: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .top) {
-                Text(game.symbol)
-                    .font(.system(size: 32))
-                Spacer()
-                Text(unlocked ? (game.isFreeAtLaunch ? "FREE" : "OWNED") : "PACK")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(unlocked ? Color.pingoPrimary : .secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.05), in: Capsule())
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.pingoPrimary.opacity(0.95), Color.pingoSecondary.opacity(0.72)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Text(game.symbol)
+                .font(.system(size: 40))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .offset(y: -9)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(game.name)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if !unlocked {
+                        Image(systemName: "lock.fill")
+                    }
+                    Text(unlocked ? "PLAY" : "PACK")
+                }
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.68))
             }
-            Text(game.name)
-                .font(.headline)
-                .foregroundStyle(Color.pingoInk)
-            HStack(spacing: 4) {
-                Text(game.family.rawValue.capitalized)
-                if !unlocked { Image(systemName: "lock.fill") }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .padding(10)
         }
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .aspectRatio(0.92, contentMode: .fit)
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.pingoPrimary.opacity(unlocked ? 0.2 : 0.08))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
         }
-        .opacity(unlocked ? 1 : 0.78)
-        .contentShape(Rectangle())
+        .opacity(unlocked ? 1 : 0.56)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -153,37 +144,114 @@ private struct ChallengeGameView: View {
     @State private var seriesFormat: PingoSeriesFormat = .single
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(game.symbol)
-                .font(.system(size: 64))
-            Text(game.name)
-                .font(.title.bold())
-            Text(PingoAccessPolicy.packTitle(for: game.id) ?? "Free game")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.pingoPrimary)
-            Text("Send a Pingo challenge in this iMessage conversation. Your friend taps the card to accept, play, and send turns back.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
+        ZStack {
+            Color.pingoMessagesChrome.ignoresSafeArea()
 
-            Picker("Series", selection: $seriesFormat) {
-                ForEach(PingoSeriesFormat.allCases, id: \.self) { format in
-                    Text(format.title).tag(format)
+            VStack(spacing: 18) {
+                Capsule()
+                    .fill(.white.opacity(0.24))
+                    .frame(width: 42, height: 5)
+                    .padding(.top, 8)
+
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.headline)
+                            .frame(width: 38, height: 38)
+                            .background(.white.opacity(0.08), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text(game.name)
+                        .font(.headline)
+
+                    Spacer()
+
+                    Button {
+                        onChallenge(seriesFormat)
+                        dismiss()
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.headline.bold())
+                            .foregroundStyle(.white)
+                            .frame(width: 42, height: 36)
+                            .background(Color.blue, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Send challenge")
                 }
-            }
-            .pickerStyle(.segmented)
 
-            Button(seriesFormat == .single ? "Send Challenge" : "Start \(seriesFormat.title)") {
-                onChallenge(seriesFormat)
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.pingoPrimary)
+                HStack(alignment: .top, spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.pingoPrimary, Color.pingoSecondary],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text(game.symbol)
+                            .font(.system(size: 56))
+                    }
+                    .frame(width: 154, height: 154)
+                    .overlay(alignment: .bottomLeading) {
+                        Text("CUSTOMIZE")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(10)
+                    }
 
-            Button("Cancel") { dismiss() }
-                .buttonStyle(.bordered)
+                    VStack(spacing: 12) {
+                        settingCard(title: "GAME", value: game.name)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("MATCH FORMAT")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white.opacity(0.7))
+
+                            Picker("Match Format", selection: $seriesFormat) {
+                                ForEach(PingoSeriesFormat.allCases, id: \.self) { format in
+                                    Text(format.title).tag(format)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
+
+                Text("The challenge will be inserted into the iMessage composer so you can send it like a normal game card.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.46))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+
+                Spacer(minLength: 4)
+            }
+            .padding(.horizontal, 18)
         }
-        .padding(28)
         .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private func settingCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.bold())
+                .foregroundStyle(.white.opacity(0.7))
+            Text(value)
+                .font(.headline)
+                .lineLimit(1)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
