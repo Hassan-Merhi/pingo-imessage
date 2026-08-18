@@ -28,15 +28,17 @@ struct PingoImmersiveGameView: View {
         ZStack {
             Color.pingoGameBackdrop
 
-            VStack(spacing: 8) {
-                playerStrip
-                    .padding(.horizontal, 14)
+            VStack(spacing: match.gameID == .cupPong ? 0 : 8) {
+                if match.gameID != .cupPong {
+                    playerStrip
+                        .padding(.horizontal, 14)
+                }
 
                 gameStage
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.top, match.gameID == .cupPong ? 0 : 8)
+            .padding(.bottom, match.gameID == .cupPong ? 0 : 10)
 
             if match.status == .awaitingOpponent || (match.status == .active && !localCanMove) {
                 waitingOverlay
@@ -61,10 +63,12 @@ struct PingoImmersiveGameView: View {
 
             case .cupPong:
                 let state = (try? PingoPhysicsGameEngine.cupPongState(from: match.gameState)) ?? PingoCupPongState()
-                PingoImmersiveCupPongView(
+                PingoCupPongPhase1View(
                     state: state,
                     player: index,
                     canMove: localCanMove,
+                    match: match,
+                    localProfile: localProfile,
                     onMove: onPhysicsMove
                 )
 
@@ -187,15 +191,43 @@ struct PingoImmersiveGameView: View {
         }
     }
 
+    @ViewBuilder
     private var waitingOverlay: some View {
-        Text(match.status == .awaitingOpponent ? "WAITING FOR OPPONENT." : "OPPONENT'S TURN.")
-            .font(.system(size: 18, weight: .heavy, design: .rounded))
+        if match.gameID == .cupPong {
+            VStack(spacing: 7) {
+                Image(systemName: match.status == .awaitingOpponent ? "hourglass" : "hand.raised.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.88))
+
+                Text(match.status == .awaitingOpponent ? "WAITING FOR OPPONENT" : "OPPONENT’S THROW")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .tracking(1)
+
+                Text(match.status == .awaitingOpponent ? "The table is ready." : "Your cups are locked until the turn comes back.")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.56))
+            }
             .foregroundStyle(.white)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 15)
-            .background(Color.pingoGameOverlay, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .shadow(radius: 8, y: 4)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 14)
+            .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .stroke(Color.white.opacity(0.09), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.36), radius: 12, y: 5)
             .accessibilityLabel(match.status == .awaitingOpponent ? "Waiting for opponent" : "Opponent's turn")
+        } else {
+            Text(match.status == .awaitingOpponent ? "WAITING FOR OPPONENT." : "OPPONENT'S TURN.")
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 15)
+                .background(Color.pingoGameOverlay, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .shadow(radius: 8, y: 4)
+                .accessibilityLabel(match.status == .awaitingOpponent ? "Waiting for opponent" : "Opponent's turn")
+        }
     }
 }
 
