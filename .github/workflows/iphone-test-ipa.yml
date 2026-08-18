@@ -2,6 +2,14 @@ name: Build iPhone Test IPA
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ios/**
+      - Sources/**
+      - Package.swift
+      - Package.resolved
+      - .github/workflows/iphone-test-ipa.yml
   pull_request:
     paths:
       - .github/workflows/iphone-test-ipa.yml

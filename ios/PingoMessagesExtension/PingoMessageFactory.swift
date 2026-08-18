@@ -4,11 +4,14 @@ import PingoCore
 @MainActor
 enum PingoMessageFactory {
     static func make(payload: PingoMessagePayload, session: MSSession) throws -> MSMessage {
-        let game = PingoGameCatalog.launch.first(where: { $0.id == payload.match.gameID })
+        let game = PingoGameCatalog.game(id: payload.match.gameID)
         let message = MSMessage(session: session)
         let layout = MSMessageTemplateLayout()
         layout.caption = "\(game?.symbol ?? "🎮") \(game?.name ?? "Pingo")"
         layout.subcaption = subtitle(for: payload)
+        if let game {
+            layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
+        }
         if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
