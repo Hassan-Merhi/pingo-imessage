@@ -62,6 +62,14 @@ struct PingoIncomingMatchView: View {
         payload.match.gameID == .eightBall
     }
 
+    private var isCupPong: Bool {
+        payload.match.gameID == .cupPong
+    }
+
+    private var hasDedicatedMatchFlow: Bool {
+        isEightBall || isCupPong
+    }
+
     var body: some View {
         ZStack {
             Color.pingoGameBackdrop.ignoresSafeArea()
@@ -70,6 +78,20 @@ struct PingoIncomingMatchView: View {
                 if isEightBall, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)) ?? PingoEightBallState()
                     PingoEightBallPhase4View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMove: onPhysicsMove,
+                        onResign: onResign,
+                        onContinueSeries: onContinueSeries,
+                        onRematch: onRematch
+                    )
+                    .padding(.top, 66)
+                } else if isCupPong, let index = localPlayerIndex {
+                    let state = (try? PingoPhysicsGameEngine.cupPongState(from: payload.match.gameState)) ?? PingoCupPongState()
+                    PingoCupPongPhase4View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
@@ -105,7 +127,7 @@ struct PingoIncomingMatchView: View {
             .padding(.top, 8)
             .padding(.bottom, 14)
 
-            if !isEightBall && (payload.match.status == .completed || payload.match.status == .resigned) {
+            if !hasDedicatedMatchFlow && (payload.match.status == .completed || payload.match.status == .resigned) {
                 resultOverlay
             }
         }
@@ -143,11 +165,11 @@ struct PingoIncomingMatchView: View {
                     Button("Unlock \(requiredPackTitle)", action: onOpenStore)
                 }
 
-                if !isEightBall && payload.match.status == .active && localIsPlayer {
+                if !hasDedicatedMatchFlow && payload.match.status == .active && localIsPlayer {
                     Button("Resign Match", role: .destructive, action: onResign)
                 }
 
-                if !isEightBall && canContinueSeries {
+                if !hasDedicatedMatchFlow && canContinueSeries {
                     Button("Continue \(payload.match.series?.format.title ?? "Series")", action: onContinueSeries)
                 }
 
@@ -240,7 +262,7 @@ struct PingoIncomingMatchView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .tint(.pingoPrimary)
-        } else if !isEightBall && canContinueSeries {
+        } else if !hasDedicatedMatchFlow && canContinueSeries {
             Button("Continue \(payload.match.series?.format.title ?? "Series")", action: onContinueSeries)
                 .font(.headline)
                 .buttonStyle(.borderedProminent)
