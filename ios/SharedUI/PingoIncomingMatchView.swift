@@ -10,6 +10,7 @@ struct PingoIncomingMatchView: View {
     let onPhysicsMove: (PingoPhysicsMove) -> Void
     let onExtraMove: (PingoExtraGameMove) -> Void
     let onContinueSeries: () -> Void
+    let onRematch: () -> Void
     let onResign: () -> Void
     let onOpenStore: () -> Void
     let onClose: () -> Void
@@ -57,33 +58,28 @@ struct PingoIncomingMatchView: View {
                 || payload.match.status == .resigned)
     }
 
+    private var isEightBall: Bool {
+        payload.match.gameID == .eightBall
+    }
+
     var body: some View {
         ZStack {
             Color.pingoGameBackdrop.ignoresSafeArea()
 
             if shouldShowGame {
-                if payload.match.gameID == .eightBall, let index = localPlayerIndex {
+                if isEightBall, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)) ?? PingoEightBallState()
-                    ZStack {
-                        PingoEightBallPhase1View(
-                            state: state,
-                            player: index,
-                            canMove: localCanMove,
-                            match: payload.match,
-                            localProfile: localProfile,
-                            onMove: onPhysicsMove
-                        )
-
-                        if payload.match.status == .awaitingOpponent || (payload.match.status == .active && !localCanMove) {
-                            Text(payload.match.status == .awaitingOpponent ? "WAITING FOR OPPONENT." : "OPPONENT'S TURN.")
-                                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 28)
-                                .padding(.vertical, 15)
-                                .background(Color.pingoGameOverlay, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                                .shadow(radius: 8, y: 4)
-                        }
-                    }
+                    PingoEightBallPhase4View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMove: onPhysicsMove,
+                        onResign: onResign,
+                        onContinueSeries: onContinueSeries,
+                        onRematch: onRematch
+                    )
                     .padding(.top, 66)
                 } else {
                     PingoImmersiveGameView(
@@ -109,7 +105,7 @@ struct PingoIncomingMatchView: View {
             .padding(.top, 8)
             .padding(.bottom, 14)
 
-            if payload.match.status == .completed || payload.match.status == .resigned {
+            if !isEightBall && (payload.match.status == .completed || payload.match.status == .resigned) {
                 resultOverlay
             }
         }
@@ -147,11 +143,11 @@ struct PingoIncomingMatchView: View {
                     Button("Unlock \(requiredPackTitle)", action: onOpenStore)
                 }
 
-                if payload.match.status == .active && localIsPlayer {
+                if !isEightBall && payload.match.status == .active && localIsPlayer {
                     Button("Resign Match", role: .destructive, action: onResign)
                 }
 
-                if canContinueSeries {
+                if !isEightBall && canContinueSeries {
                     Button("Continue \(payload.match.series?.format.title ?? "Series")", action: onContinueSeries)
                 }
 
@@ -244,7 +240,7 @@ struct PingoIncomingMatchView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .tint(.pingoPrimary)
-        } else if canContinueSeries {
+        } else if !isEightBall && canContinueSeries {
             Button("Continue \(payload.match.series?.format.title ?? "Series")", action: onContinueSeries)
                 .font(.headline)
                 .buttonStyle(.borderedProminent)
@@ -287,9 +283,7 @@ struct PingoIncomingMatchView: View {
 
         switch payload.match.status {
         case .active:
-            return payload.match.currentPlayerID == localProfile.id
-                ? "Your turn"
-                : "Opponent's turn"
+            return payload.match.currentPlayerID == localProfile.id ? "Your turn" : "Opponent's turn"
         case .completed, .resigned:
             return "Final result"
         case .awaitingOpponent:

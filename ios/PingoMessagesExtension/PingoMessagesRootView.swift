@@ -18,9 +18,6 @@ struct PingoMessagesRootView: View {
             if model.presentationStyle == .compact {
                 PingoCompactHomeView(onOpen: onRequestExpanded)
                     .onAppear {
-                        // Match the interaction pattern people expect from game-first
-                        // iMessage apps: tapping Pingo should open the actual game browser,
-                        // not leave them stranded on a mostly-empty compact launcher.
                         Task { @MainActor in
                             onRequestExpanded()
                         }
@@ -37,6 +34,9 @@ struct PingoMessagesRootView: View {
                             onPhysicsMove: onPhysicsMove,
                             onExtraMove: onExtraMove,
                             onContinueSeries: onContinueSeries,
+                            onRematch: {
+                                onChallenge(payload.match.gameID, payload.match.series?.format ?? .single)
+                            },
                             onResign: onResign,
                             onOpenStore: model.showStore,
                             onClose: model.clearIncomingMatch
