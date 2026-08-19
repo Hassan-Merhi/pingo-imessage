@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Cup Pong Phase 5 iMessage polish validation 2026-08-19
+# Rebuild marker: Cup Pong Phase 5 final validation rerun 2026-08-19
 
 on:
   workflow_dispatch:
@@ -61,9 +61,6 @@ jobs:
           test -d "$APP_PATH"
           test -d "$EXTENSION_PATH"
 
-          # Xcode's unoptimized Debug layout puts executable code in *.debug.dylib
-          # plus __preview.dylib. Some third-party re-signers do not recursively
-          # re-sign those loader dylibs correctly, leaving Messages with a blank host.
           if find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) | grep -q .; then
             echo "Unexpected Xcode debug-loader dylib found in sideload artifact:" >&2
             find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) >&2
@@ -83,8 +80,6 @@ jobs:
           mkdir -p build/iphone-test/Payload
           cp -R "$APP_PATH" build/iphone-test/Payload/Pingo.app
 
-          # Intentionally unsigned. A sideloading tool applies the user's personal
-          # development certificate/profile to the app and embedded Messages extension.
           (cd build/iphone-test && /usr/bin/zip -qry Pingo-Test-Release.ipa Payload)
 
           test -s build/iphone-test/Pingo-Test-Release.ipa
