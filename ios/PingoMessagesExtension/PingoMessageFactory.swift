@@ -9,12 +9,17 @@ enum PingoMessageFactory {
         let layout = MSMessageTemplateLayout()
         layout.caption = "\(game?.symbol ?? "🎮") \(game?.name ?? "Pingo")"
         layout.subcaption = subtitle(for: payload)
-        if let game {
+
+        if payload.match.gameID == .cupPong {
+            layout.image = PingoCupPongMessagePreviewRenderer.image(payload: payload)
+        } else if let game {
             layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
         }
 
         if payload.match.gameID == .eightBall {
             configureEightBallTrailing(layout: layout, payload: payload)
+        } else if payload.match.gameID == .cupPong {
+            configureCupPongTrailing(layout: layout, payload: payload)
         } else if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
@@ -59,6 +64,42 @@ enum PingoMessageFactory {
         }
     }
 
+    private static func configureCupPongTrailing(layout: MSMessageTemplateLayout, payload: PingoMessagePayload) {
+        let state = try? PingoPhysicsGameEngine.cupPongState(from: payload.match.gameState)
+        let cups = state?.cups ?? []
+        let senderIndex = payload.match.players.firstIndex(where: { $0.id == payload.sender.id }) ?? 0
+        let opponentIndex = senderIndex == 0 ? 1 : 0
+        let senderRemaining = cups.indices.contains(senderIndex) ? cups[senderIndex].filter { $0 }.count : 6
+        let opponentRemaining = cups.indices.contains(opponentIndex) ? cups[opponentIndex].filter { $0 }.count : 6
+
+        if let series = payload.match.series {
+            layout.trailingCaption = "CUP PONG • \(series.format.title)"
+            layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
+            return
+        }
+
+        switch payload.match.status {
+        case .awaitingOpponent:
+            layout.trailingCaption = "CUP PONG"
+            layout.trailingSubcaption = "6 cups • Challenge"
+        case .active:
+            layout.trailingCaption = state?.lastCup == nil && (state?.turns ?? 0) > 0 ? "MISS" : "CUP PONG"
+            layout.trailingSubcaption = "You \(senderRemaining) • Them \(opponentRemaining)"
+        case .completed:
+            layout.trailingCaption = "CUP PONG"
+            layout.trailingSubcaption = "Final cups \(senderRemaining)–\(opponentRemaining)"
+        case .resigned:
+            layout.trailingCaption = "CUP PONG"
+            layout.trailingSubcaption = "Match ended"
+        case .draft:
+            layout.trailingCaption = "CUP PONG"
+            layout.trailingSubcaption = "Preparing"
+        case .expired:
+            layout.trailingCaption = "CUP PONG"
+            layout.trailingSubcaption = "Expired"
+        }
+    }
+
     private static func subtitle(for payload: PingoMessagePayload) -> String {
         if payload.match.gameID == .eightBall {
             switch payload.action {
@@ -77,6 +118,27 @@ enum PingoMessageFactory {
                 return payload.match.series?.completed == true ? "Series complete • see the result" : "Rack complete • see the result"
             case .rematch:
                 return "New rack ready"
+            }
+        }
+
+        if payload.match.gameID == .cupPong {
+            let state = try? PingoPhysicsGameEngine.cupPongState(from: payload.match.gameState)
+            switch payload.action {
+            case .challenge:
+                if let series = payload.match.series {
+                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
+                }
+                return "@\(payload.sender.username) challenged you to Cup Pong"
+            case .accepted:
+                return "Table ready • first throw is live"
+            case .turn:
+                return state?.lastCup == nil ? "Miss • your throw" : "Cup sunk • your throw"
+            case .resigned:
+                return "@\(payload.sender.username) ended the match"
+            case .completed:
+                return payload.match.series?.completed == true ? "Series complete • see the result" : "Last cup down • see the result"
+            case .rematch:
+                return "Fresh cups • next game ready"
             }
         }
 
