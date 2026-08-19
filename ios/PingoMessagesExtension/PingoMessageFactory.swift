@@ -12,6 +12,8 @@ enum PingoMessageFactory {
 
         if payload.match.gameID == .cupPong {
             layout.image = PingoCupPongMessagePreviewRenderer.image(payload: payload)
+        } else if payload.match.gameID == .basketball {
+            layout.image = PingoBasketballMessagePreviewRenderer.image(payload: payload)
         } else if let game {
             layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
         }
@@ -20,6 +22,8 @@ enum PingoMessageFactory {
             configureEightBallTrailing(layout: layout, payload: payload)
         } else if payload.match.gameID == .cupPong {
             configureCupPongTrailing(layout: layout, payload: payload)
+        } else if payload.match.gameID == .basketball {
+            configureBasketballTrailing(layout: layout, payload: payload)
         } else if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
@@ -100,6 +104,46 @@ enum PingoMessageFactory {
         }
     }
 
+    private static func configureBasketballTrailing(layout: MSMessageTemplateLayout, payload: PingoMessagePayload) {
+        let state = try? PingoPhysicsGameEngine.basketballState(from: payload.match.gameState)
+        let scores = state?.scores ?? [0, 0]
+        let attempts = state?.attempts ?? [0, 0]
+        let senderIndex = payload.match.players.firstIndex(where: { $0.id == payload.sender.id }) ?? 0
+        let opponentIndex = senderIndex == 0 ? 1 : 0
+        let senderScore = scores.indices.contains(senderIndex) ? scores[senderIndex] : 0
+        let opponentScore = scores.indices.contains(opponentIndex) ? scores[opponentIndex] : 0
+        let senderAttempts = attempts.indices.contains(senderIndex) ? attempts[senderIndex] : 0
+        let opponentAttempts = attempts.indices.contains(opponentIndex) ? attempts[opponentIndex] : 0
+        let attemptsPerPlayer = state?.attemptsPerPlayer ?? 5
+
+        if let series = payload.match.series {
+            layout.trailingCaption = "BASKETBALL • \(series.format.title)"
+            layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
+            return
+        }
+
+        switch payload.match.status {
+        case .awaitingOpponent:
+            layout.trailingCaption = "BASKETBALL"
+            layout.trailingSubcaption = "5 shots • Challenge"
+        case .active:
+            layout.trailingCaption = state?.lastPoints == 3 ? "SWISH +3" : state?.lastPoints == 2 ? "BUCKET +2" : (senderAttempts + opponentAttempts > 0 ? "MISS" : "BASKETBALL")
+            layout.trailingSubcaption = "You \(senderScore) • Them \(opponentScore) • \(senderAttempts)/\(attemptsPerPlayer)"
+        case .completed:
+            layout.trailingCaption = "BASKETBALL"
+            layout.trailingSubcaption = "Final \(senderScore)–\(opponentScore)"
+        case .resigned:
+            layout.trailingCaption = "BASKETBALL"
+            layout.trailingSubcaption = "Match ended"
+        case .draft:
+            layout.trailingCaption = "BASKETBALL"
+            layout.trailingSubcaption = "Preparing"
+        case .expired:
+            layout.trailingCaption = "BASKETBALL"
+            layout.trailingSubcaption = "Expired"
+        }
+    }
+
     private static func subtitle(for payload: PingoMessagePayload) -> String {
         if payload.match.gameID == .eightBall {
             switch payload.action {
@@ -139,6 +183,29 @@ enum PingoMessageFactory {
                 return payload.match.series?.completed == true ? "Series complete • see the result" : "Last cup down • see the result"
             case .rematch:
                 return "Fresh cups • next game ready"
+            }
+        }
+
+        if payload.match.gameID == .basketball {
+            let state = try? PingoPhysicsGameEngine.basketballState(from: payload.match.gameState)
+            switch payload.action {
+            case .challenge:
+                if let series = payload.match.series {
+                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
+                }
+                return "@\(payload.sender.username) challenged you to Basketball"
+            case .accepted:
+                return "Court ready • first shot is live"
+            case .turn:
+                if state?.lastPoints == 3 { return "Swish +3 • your shot" }
+                if state?.lastPoints == 2 { return "Bucket +2 • your shot" }
+                return "Miss • your shot"
+            case .resigned:
+                return "@\(payload.sender.username) ended the match"
+            case .completed:
+                return payload.match.series?.completed == true ? "Series complete • see the result" : "Shootout complete • see the result"
+            case .rematch:
+                return "Fresh shootout • next game ready"
             }
         }
 
