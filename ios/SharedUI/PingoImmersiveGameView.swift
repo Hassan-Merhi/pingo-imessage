@@ -76,7 +76,7 @@ struct PingoImmersiveGameView: View {
 
             case .basketball:
                 let state = (try? PingoPhysicsGameEngine.basketballState(from: match.gameState)) ?? PingoBasketballState()
-                PingoBasketballPhase1View(
+                PingoBasketballPhase3View(
                     state: state,
                     player: index,
                     canMove: localCanMove,
