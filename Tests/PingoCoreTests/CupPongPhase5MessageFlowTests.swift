@@ -24,7 +24,7 @@ final class CupPongPhase5MessageFlowTests: XCTestCase {
         let challengePayload = PingoMessagePayload(action: .challenge, sender: host, match: challenge)
         let decodedChallenge = try roundTrip(challengePayload)
         XCTAssertEqual(decodedChallenge.match.status, .awaitingOpponent)
-        XCTAssertFalse(decodedChallenge.match.gameState.isEmpty)
+        XCTAssertEqual(decodedChallenge.match.gameID, .cupPong)
 
         let accepted = try PingoMatchReducer.accept(
             decodedChallenge.match,
@@ -35,6 +35,10 @@ final class CupPongPhase5MessageFlowTests: XCTestCase {
         var current = try roundTrip(PingoMessagePayload(action: .accepted, sender: guest, match: accepted)).match
         XCTAssertEqual(current.status, .active)
         XCTAssertEqual(current.currentPlayerID, host.id)
+        XCTAssertFalse(current.gameState.isEmpty)
+        let initialState = try PingoPhysicsGameEngine.cupPongState(from: current.gameState)
+        XCTAssertEqual(initialState.cups[0].filter { $0 }.count, 6)
+        XCTAssertEqual(initialState.cups[1].filter { $0 }.count, 6)
 
         let cupShots: [PingoAimShot] = [
             .init(angleDegrees: -10.8, power: 0.82),
