@@ -85,7 +85,7 @@ struct PingoImmersiveGameView: View {
 
             case .darts:
                 let state = (try? PingoPhysicsGameEngine.dartsState(from: match.gameState)) ?? PingoDartsState()
-                PingoDartsPhase2View(
+                PingoDartsPhase3View(
                     state: state,
                     player: index,
                     canMove: localCanMove,

@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Darts Phase 2 native controls validation 2026-08-19
+# Rebuild marker: Darts Phase 3 physics animations validation 2026-08-20
 
 on:
   workflow_dispatch:
