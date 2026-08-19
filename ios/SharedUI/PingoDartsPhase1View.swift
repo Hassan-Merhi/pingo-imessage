@@ -1,13 +1,16 @@
 import PingoCore
 import SwiftUI
 
-struct PingoDartsPhase1View: View {
+struct PingoDartsPhase2View: View {
     let state: PingoDartsState
     let player: Int
     let canMove: Bool
     let onMove: (PingoPhysicsMove) -> Void
 
     @State private var darts: [PingoDartPoint] = []
+    @State private var aimPoint = PingoDartPoint(x: 0, y: 0)
+    @State private var throwPower: CGFloat = 0
+    @State private var isFlicking = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -24,10 +27,13 @@ struct PingoDartsPhase1View: View {
             visitTray
 
             if canMove {
+                throwDeck
+
                 Button {
                     guard darts.count == 3 else { return }
                     onMove(.darts(.init(darts: darts)))
                     darts.removeAll()
+                    aimPoint = .init(x: 0, y: 0)
                 } label: {
                     Label("Send Visit", systemImage: "scope")
                         .font(.system(size: 15, weight: .heavy, design: .rounded))
@@ -52,6 +58,9 @@ struct PingoDartsPhase1View: View {
         .padding(.bottom, 6)
         .onChange(of: state.remaining) { _ in
             darts.removeAll()
+            aimPoint = .init(x: 0, y: 0)
+            throwPower = 0
+            isFlicking = false
         }
     }
 
@@ -64,7 +73,7 @@ struct PingoDartsPhase1View: View {
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .tracking(1.2)
                     .foregroundStyle(.white)
-                Text("301 • BEST CHECKOUT")
+                Text("301 • AIM + FLICK")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .tracking(0.7)
                     .foregroundStyle(.white.opacity(0.48))
@@ -105,13 +114,9 @@ struct PingoDartsPhase1View: View {
                 )
             )
             .overlay(alignment: .top) {
-                LinearGradient(
-                    colors: [.white.opacity(0.11), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 90)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                LinearGradient(colors: [.white.opacity(0.11), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -130,9 +135,12 @@ struct PingoDartsPhase1View: View {
                 .frame(width: diameter + 26, height: diameter + 26)
                 .shadow(color: .black.opacity(0.55), radius: 12, y: 7)
 
-            PingoPhase1DartBoard(darts: darts, enabled: canMove && darts.count < 3) { point in
-                darts.append(point)
-            }
+            PingoPhase2DartBoard(
+                darts: darts,
+                aimPoint: aimPoint,
+                enabled: canMove && darts.count < 3,
+                onAim: { aimPoint = $0 }
+            )
             .frame(width: diameter, height: diameter)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,7 +170,7 @@ struct PingoDartsPhase1View: View {
                     .font(.system(size: 9, weight: .black, design: .rounded))
                     .tracking(0.7)
                     .foregroundStyle(.white.opacity(0.55))
-                Text(canMove ? "Tap the board • \(darts.count)/3 darts" : "Board locked")
+                Text(canMove ? "Aim on board • flick to throw • \(darts.count)/3" : "Board locked")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.84))
             }
@@ -172,6 +180,7 @@ struct PingoDartsPhase1View: View {
             if canMove && !darts.isEmpty {
                 Button {
                     darts.removeAll()
+                    throwPower = 0
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 13, weight: .bold))
@@ -192,15 +201,108 @@ struct PingoDartsPhase1View: View {
         }
     }
 
+    private var throwDeck: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.white.opacity(0.075))
+
+                HStack(spacing: 12) {
+                    ZStack(alignment: .bottom) {
+                        Capsule()
+                            .fill(.white.opacity(0.10))
+                            .frame(width: 8, height: 42)
+                        Capsule()
+                            .fill(Color(red: 0.88, green: 0.16, blue: 0.12))
+                            .frame(width: 8, height: max(4, 42 * throwPower))
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isFlicking ? "RELEASE TO THROW" : "FLICK UP TO THROW")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .tracking(0.7)
+                            .foregroundStyle(.white)
+                        Text("Drag on the board to move the sight. A small sideways flick fine-tunes the release.")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 6)
+
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundStyle(.white.opacity(isFlicking ? 1 : 0.58))
+                        .offset(y: isFlicking ? -8 : 0)
+                }
+                .padding(.horizontal, 14)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        guard darts.count < 3 else { return }
+                        isFlicking = true
+                        let upward = max(0, -value.translation.height)
+                        throwPower = min(1, upward / 92)
+                    }
+                    .onEnded { value in
+                        guard darts.count < 3 else {
+                            resetThrowDeck()
+                            return
+                        }
+
+                        let upward = max(0, -value.translation.height)
+                        guard upward >= 42 else {
+                            resetThrowDeck()
+                            return
+                        }
+
+                        let horizontalNudge = Double(value.translation.width / width) * 0.34
+                        let point = clampedDartPoint(
+                            x: aimPoint.x + horizontalNudge,
+                            y: aimPoint.y
+                        )
+                        darts.append(point)
+                        aimPoint = point
+                        resetThrowDeck()
+                    }
+            )
+        }
+        .frame(height: 66)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Dart throw control")
+        .accessibilityHint("Swipe upward to throw at the current aim point")
+    }
+
+    private func resetThrowDeck() {
+        throwPower = 0
+        isFlicking = false
+    }
+
+    private func clampedDartPoint(x: Double, y: Double) -> PingoDartPoint {
+        var px = max(-1, min(1, x))
+        var py = max(-1, min(1, y))
+        let radius = sqrt(px * px + py * py)
+        if radius > 1 {
+            px /= radius
+            py /= radius
+        }
+        return .init(x: px, y: py)
+    }
+
     private func remaining(_ index: Int) -> Int {
         state.remaining.indices.contains(index) ? state.remaining[index] : 301
     }
 }
 
-private struct PingoPhase1DartBoard: View {
+private struct PingoPhase2DartBoard: View {
     let darts: [PingoDartPoint]
+    let aimPoint: PingoDartPoint
     let enabled: Bool
-    let onTap: (PingoDartPoint) -> Void
+    let onAim: (PingoDartPoint) -> Void
 
     private let numbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
 
@@ -211,8 +313,7 @@ private struct PingoPhase1DartBoard: View {
             let outerRadius = size / 2
 
             ZStack {
-                Circle()
-                    .fill(Color(red: 0.055, green: 0.05, blue: 0.045))
+                Circle().fill(Color(red: 0.055, green: 0.05, blue: 0.045))
 
                 ForEach(0..<20, id: \.self) { index in
                     let start = Double(index) * 18 - 99
@@ -221,28 +322,16 @@ private struct PingoPhase1DartBoard: View {
 
                     PingoDartSector(startDegrees: start, endDegrees: end, innerFraction: 0.17, outerFraction: 0.87)
                         .fill(lightSector ? Color(red: 0.88, green: 0.84, blue: 0.68) : Color(red: 0.10, green: 0.095, blue: 0.085))
-
                     PingoDartSector(startDegrees: start, endDegrees: end, innerFraction: 0.54, outerFraction: 0.62)
                         .fill(lightSector ? Color(red: 0.10, green: 0.47, blue: 0.26) : Color(red: 0.76, green: 0.08, blue: 0.08))
-
                     PingoDartSector(startDegrees: start, endDegrees: end, innerFraction: 0.79, outerFraction: 0.87)
                         .fill(lightSector ? Color(red: 0.10, green: 0.47, blue: 0.26) : Color(red: 0.76, green: 0.08, blue: 0.08))
                 }
 
-                Circle()
-                    .stroke(Color.black.opacity(0.72), lineWidth: 2)
-                    .padding(size * 0.065)
-
-                Circle()
-                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                    .padding(size * 0.19)
-
-                Circle()
-                    .fill(Color(red: 0.10, green: 0.45, blue: 0.25))
-                    .frame(width: size * 0.13, height: size * 0.13)
-                Circle()
-                    .fill(Color(red: 0.76, green: 0.07, blue: 0.07))
-                    .frame(width: size * 0.055, height: size * 0.055)
+                Circle().stroke(Color.black.opacity(0.72), lineWidth: 2).padding(size * 0.065)
+                Circle().stroke(Color.white.opacity(0.16), lineWidth: 1).padding(size * 0.19)
+                Circle().fill(Color(red: 0.10, green: 0.45, blue: 0.25)).frame(width: size * 0.13, height: size * 0.13)
+                Circle().fill(Color(red: 0.76, green: 0.07, blue: 0.07)).frame(width: size * 0.055, height: size * 0.055)
 
                 ForEach(0..<20, id: \.self) { index in
                     let angle = Double(index) * 18 - 90
@@ -257,30 +346,63 @@ private struct PingoPhase1DartBoard: View {
                 }
 
                 ForEach(Array(darts.enumerated()), id: \.offset) { index, dart in
-                    PingoPhase1DartMarker(index: index)
-                        .position(
-                            x: proxy.size.width * CGFloat(dart.x / 2 + 0.5),
-                            y: proxy.size.height * CGFloat(dart.y / 2 + 0.5)
-                        )
+                    PingoPhase2DartMarker(index: index)
+                        .position(position(for: dart, in: proxy.size))
+                }
+
+                if enabled {
+                    PingoDartAimSight()
+                        .position(position(for: aimPoint, in: proxy.size))
+                        .allowsHitTesting(false)
                 }
             }
-            .overlay {
-                Circle().stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
+            .overlay { Circle().stroke(Color.white.opacity(0.12), lineWidth: 1) }
             .contentShape(Circle())
             .gesture(
-                DragGesture(minimumDistance: 0).onEnded { value in
-                    guard enabled, proxy.size.width > 0, proxy.size.height > 0 else { return }
-                    let nx = Double((value.location.x / proxy.size.width - 0.5) * 2)
-                    let ny = Double((value.location.y / proxy.size.height - 0.5) * 2)
-                    guard nx * nx + ny * ny <= 1 else { return }
-                    onTap(.init(x: nx, y: ny))
-                }
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in updateAim(value.location, size: proxy.size) }
+                    .onEnded { value in updateAim(value.location, size: proxy.size) }
             )
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityLabel("Dartboard")
-        .accessibilityHint(enabled ? "Tap a target to place a dart" : "Waiting for opponent")
+        .accessibilityHint(enabled ? "Drag across the board to aim, then flick upward below the board to throw" : "Waiting for opponent")
+    }
+
+    private func updateAim(_ location: CGPoint, size: CGSize) {
+        guard enabled, size.width > 0, size.height > 0 else { return }
+        var nx = Double((location.x / size.width - 0.5) * 2)
+        var ny = Double((location.y / size.height - 0.5) * 2)
+        let radius = sqrt(nx * nx + ny * ny)
+        if radius > 1 {
+            nx /= radius
+            ny /= radius
+        }
+        onAim(.init(x: nx, y: ny))
+    }
+
+    private func position(for point: PingoDartPoint, in size: CGSize) -> CGPoint {
+        CGPoint(
+            x: size.width * CGFloat(point.x / 2 + 0.5),
+            y: size.height * CGFloat(point.y / 2 + 0.5)
+        )
+    }
+}
+
+private struct PingoDartAimSight: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.94), lineWidth: 1.5)
+                .frame(width: 34, height: 34)
+            Circle()
+                .stroke(Color(red: 0.92, green: 0.16, blue: 0.12), lineWidth: 2)
+                .frame(width: 18, height: 18)
+            Rectangle().fill(.white.opacity(0.88)).frame(width: 1, height: 42)
+            Rectangle().fill(.white.opacity(0.88)).frame(width: 42, height: 1)
+            Circle().fill(Color(red: 0.92, green: 0.16, blue: 0.12)).frame(width: 5, height: 5)
+        }
+        .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
     }
 }
 
@@ -306,7 +428,7 @@ private struct PingoDartSector: Shape {
     }
 }
 
-private struct PingoPhase1DartMarker: View {
+private struct PingoPhase2DartMarker: View {
     let index: Int
 
     var body: some View {
