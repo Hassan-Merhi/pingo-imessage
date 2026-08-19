@@ -13,6 +13,8 @@ struct PingoBasketballPhase4View: View {
     let onRematch: () -> Void
 
     @State private var showResignConfirmation = false
+    @State private var isRefreshingTurn = false
+    @State private var refreshTask: Task<Void, Never>?
 
     private var opponentIndex: Int { player == 0 ? 1 : 0 }
 
@@ -40,7 +42,7 @@ struct PingoBasketballPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: handleMove
             )
 
             VStack(spacing: 0) {
@@ -74,6 +76,22 @@ struct PingoBasketballPhase4View: View {
             } else if match.status == .completed || match.status == .resigned {
                 resultState
             }
+
+            if isRefreshingTurn && match.status == .active {
+                VStack(spacing: 7) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("UPDATING COURT")
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .tracking(1)
+                }
+                .foregroundStyle(.white.opacity(0.82))
+                .padding(.horizontal, 17)
+                .padding(.vertical, 12)
+                .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
         }
         .confirmationDialog(
             "Resign this Basketball match?",
@@ -85,6 +103,42 @@ struct PingoBasketballPhase4View: View {
         } message: {
             Text("The other player will be awarded the match.")
         }
+        .onAppear {
+            PingoBasketballFeedback.prepare()
+            if match.status == .completed || match.status == .resigned {
+                PingoBasketballFeedback.matchFinished(won: localWon)
+            }
+        }
+        .onChange(of: state.attempts.reduce(0, +)) { _ in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            if state.lastPoints > 0 {
+                PingoBasketballFeedback.basket(points: state.lastPoints)
+            } else {
+                PingoBasketballFeedback.miss()
+            }
+            pulseRefresh()
+        }
+        .onChange(of: canMove) { newValue in
+            if newValue && match.status == .active {
+                PingoBasketballFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.revision) { _ in
+            pulseRefresh()
+        }
+        .onChange(of: match.status) { newStatus in
+            if newStatus == .completed || newStatus == .resigned {
+                PingoBasketballFeedback.matchFinished(won: localWon)
+            }
+        }
+        .onDisappear {
+            refreshTask?.cancel()
+        }
+    }
+
+    private func handleMove(_ move: PingoPhysicsMove) {
+        PingoBasketballFeedback.shotReleased()
+        onMove(move)
     }
 
     @ViewBuilder
@@ -252,6 +306,20 @@ struct PingoBasketballPhase4View: View {
 
     private func attempts(_ index: Int) -> Int {
         state.attempts.indices.contains(index) ? state.attempts[index] : 0
+    }
+
+    private func pulseRefresh() {
+        refreshTask?.cancel()
+        withAnimation(.easeOut(duration: 0.12)) {
+            isRefreshingTurn = true
+        }
+        refreshTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.14)) {
+                isRefreshingTurn = false
+            }
+        }
     }
 }
 
