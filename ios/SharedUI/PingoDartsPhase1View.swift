@@ -50,7 +50,7 @@ struct PingoDartsPhase1View: View {
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
-        .onChange(of: state.remaining) { _, _ in
+        .onChange(of: state.remaining) { _ in
             darts.removeAll()
         }
     }
