@@ -58,24 +58,14 @@ struct PingoIncomingMatchView: View {
                 || payload.match.status == .resigned)
     }
 
-    private var isEightBall: Bool {
-        payload.match.gameID == .eightBall
-    }
-
-    private var isCupPong: Bool {
-        payload.match.gameID == .cupPong
-    }
-
-    private var isBasketball: Bool {
-        payload.match.gameID == .basketball
-    }
-
-    private var isDarts: Bool {
-        payload.match.gameID == .darts
-    }
+    private var isEightBall: Bool { payload.match.gameID == .eightBall }
+    private var isCupPong: Bool { payload.match.gameID == .cupPong }
+    private var isBasketball: Bool { payload.match.gameID == .basketball }
+    private var isDarts: Bool { payload.match.gameID == .darts }
+    private var isMiniGolf: Bool { payload.match.gameID == .miniGolf }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf
     }
 
     var body: some View {
@@ -128,6 +118,20 @@ struct PingoIncomingMatchView: View {
                 } else if isDarts, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)) ?? PingoDartsState()
                     PingoDartsPhase4View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMove: onPhysicsMove,
+                        onResign: onResign,
+                        onContinueSeries: onContinueSeries,
+                        onRematch: onRematch
+                    )
+                    .padding(.top, 66)
+                } else if isMiniGolf, let index = localPlayerIndex {
+                    let state = (try? PingoPhysicsGameEngine.miniGolfState(from: payload.match.gameState)) ?? PingoMiniGolfState()
+                    PingoMiniGolfPhase4View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
