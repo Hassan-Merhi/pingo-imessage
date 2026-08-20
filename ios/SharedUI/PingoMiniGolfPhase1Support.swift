@@ -7,7 +7,7 @@ import SwiftUI
 typealias PingoRect = PingoMiniGolfRect
 
 @MainActor
-func controlRow<Control: View>(
+func miniGolfControlRow<Control: View>(
     title: String,
     value: Int,
     suffix: String,
@@ -28,7 +28,7 @@ func controlRow<Control: View>(
 }
 
 @MainActor
-func sendButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+func miniGolfSendButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {
         Label(title, systemImage: icon)
             .font(.headline.weight(.bold))
