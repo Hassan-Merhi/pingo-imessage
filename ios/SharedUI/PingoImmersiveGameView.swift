@@ -94,7 +94,7 @@ struct PingoImmersiveGameView: View {
 
             case .miniGolf:
                 let state = (try? PingoPhysicsGameEngine.miniGolfState(from: match.gameState)) ?? PingoMiniGolfState()
-                PingoImmersiveMiniGolfView(
+                PingoMiniGolfPhase1View(
                     state: state,
                     player: index,
                     canMove: localCanMove,
