@@ -74,12 +74,28 @@ struct PingoDartsPhase4View: View {
                 resultState
             }
         }
+        .onAppear {
+            PingoDartsFeedback.prepare()
+        }
+        .onChange(of: canMove) { value in
+            if value && match.status == .active {
+                PingoDartsFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoDartsFeedback.matchFinished(won: localWon)
+            }
+        }
         .confirmationDialog(
             "Resign this Darts match?",
             isPresented: $showResignConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Resign Match", role: .destructive, action: onResign)
+            Button("Resign Match", role: .destructive) {
+                PingoDartsFeedback.dartThrown()
+                onResign()
+            }
             Button("Keep Playing", role: .cancel) {}
         } message: {
             Text("The other player will be awarded the match.")
@@ -223,11 +239,17 @@ struct PingoDartsPhase4View: View {
             }
 
             if canContinueSeries {
-                Button("Next Game", action: onContinueSeries)
-                    .buttonStyle(DartsPhase4PrimaryButtonStyle())
+                Button("Next Game") {
+                    PingoDartsFeedback.dartThrown()
+                    onContinueSeries()
+                }
+                .buttonStyle(DartsPhase4PrimaryButtonStyle())
             } else {
-                Button("Rematch", action: onRematch)
-                    .buttonStyle(DartsPhase4PrimaryButtonStyle())
+                Button("Rematch") {
+                    PingoDartsFeedback.dartThrown()
+                    onRematch()
+                }
+                .buttonStyle(DartsPhase4PrimaryButtonStyle())
             }
         }
         .padding(.horizontal, 25)
