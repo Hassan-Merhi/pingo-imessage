@@ -330,13 +330,13 @@ struct PingoMiniGolfPhase1View: View {
 
     private var controls: some View {
         VStack(spacing: 10) {
-            controlRow(title: "Aim", value: Int(angle.rounded()), suffix: "°") {
+            miniGolfControlRow(title: "Aim", value: Int(angle.rounded()), suffix: "°") {
                 Slider(value: $angle, in: 0...359)
             }
-            controlRow(title: "Power", value: Int((power * 100).rounded()), suffix: "%") {
+            miniGolfControlRow(title: "Power", value: Int((power * 100).rounded()), suffix: "%") {
                 Slider(value: $power, in: 0.05...1)
             }
-            sendButton(title: "Putt", icon: "flag.fill") {
+            miniGolfSendButton(title: "Putt", icon: "flag.fill") {
                 onMove(.miniGolf(.init(angleDegrees: angle, power: power)))
             }
         }
