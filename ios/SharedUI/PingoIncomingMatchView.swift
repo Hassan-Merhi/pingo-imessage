@@ -70,8 +70,12 @@ struct PingoIncomingMatchView: View {
         payload.match.gameID == .basketball
     }
 
+    private var isDarts: Bool {
+        payload.match.gameID == .darts
+    }
+
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball
+        isEightBall || isCupPong || isBasketball || isDarts
     }
 
     var body: some View {
@@ -110,6 +114,20 @@ struct PingoIncomingMatchView: View {
                 } else if isBasketball, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.basketballState(from: payload.match.gameState)) ?? PingoBasketballState()
                     PingoBasketballPhase4View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMove: onPhysicsMove,
+                        onResign: onResign,
+                        onContinueSeries: onContinueSeries,
+                        onRematch: onRematch
+                    )
+                    .padding(.top, 66)
+                } else if isDarts, let index = localPlayerIndex {
+                    let state = (try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)) ?? PingoDartsState()
+                    PingoDartsPhase4View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
