@@ -63,6 +63,7 @@ struct PingoMiniGolfPhase3View: View {
             }
         }
         .animation(.easeInOut(duration: 0.16), value: isAnimatingPutt)
+        .onAppear { PingoMiniGolfFeedback.prepare() }
     }
 
     private func intercept(_ move: PingoPhysicsMove) {
@@ -84,6 +85,7 @@ struct PingoMiniGolfPhase3View: View {
         isAnimatingPutt = true
         rollProgress = 0
         impactPulse = false
+        PingoMiniGolfFeedback.puttReleased()
 
         let duration = 0.76 + (0.34 * shot.power)
         withAnimation(.timingCurve(0.18, 0.72, 0.22, 1.0, duration: duration)) {
@@ -94,6 +96,7 @@ struct PingoMiniGolfPhase3View: View {
             withAnimation(.spring(response: 0.22, dampingFraction: 0.58)) {
                 impactPulse = true
             }
+            PingoMiniGolfFeedback.puttResolved(holed: pendingHoled, autoFinished: pendingAutoFinished)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.25) {
