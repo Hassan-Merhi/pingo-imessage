@@ -14,6 +14,8 @@ enum PingoMessageFactory {
             layout.image = PingoCupPongMessagePreviewRenderer.image(payload: payload)
         } else if payload.match.gameID == .basketball {
             layout.image = PingoBasketballMessagePreviewRenderer.image(payload: payload)
+        } else if payload.match.gameID == .darts {
+            layout.image = PingoDartsMessagePreviewRenderer.image(payload: payload)
         } else if let game {
             layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
         }
@@ -24,6 +26,8 @@ enum PingoMessageFactory {
             configureCupPongTrailing(layout: layout, payload: payload)
         } else if payload.match.gameID == .basketball {
             configureBasketballTrailing(layout: layout, payload: payload)
+        } else if payload.match.gameID == .darts {
+            configureDartsTrailing(layout: layout, payload: payload)
         } else if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
@@ -144,6 +148,42 @@ enum PingoMessageFactory {
         }
     }
 
+    private static func configureDartsTrailing(layout: MSMessageTemplateLayout, payload: PingoMessagePayload) {
+        let state = try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)
+        let remaining = state?.remaining ?? [301, 301]
+        let senderIndex = payload.match.players.firstIndex(where: { $0.id == payload.sender.id }) ?? 0
+        let opponentIndex = senderIndex == 0 ? 1 : 0
+        let senderRemaining = remaining.indices.contains(senderIndex) ? remaining[senderIndex] : 301
+        let opponentRemaining = remaining.indices.contains(opponentIndex) ? remaining[opponentIndex] : 301
+
+        if let series = payload.match.series {
+            layout.trailingCaption = "DARTS 301 • \(series.format.title)"
+            layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
+            return
+        }
+
+        switch payload.match.status {
+        case .awaitingOpponent:
+            layout.trailingCaption = "DARTS 301"
+            layout.trailingSubcaption = "Race to zero • Challenge"
+        case .active:
+            layout.trailingCaption = (state?.lastVisitScore ?? 0) > 0 ? "VISIT \(state?.lastVisitScore ?? 0)" : "DARTS 301"
+            layout.trailingSubcaption = "You \(senderRemaining) • Them \(opponentRemaining)"
+        case .completed:
+            layout.trailingCaption = "DARTS 301"
+            layout.trailingSubcaption = "Final \(senderRemaining)–\(opponentRemaining)"
+        case .resigned:
+            layout.trailingCaption = "DARTS 301"
+            layout.trailingSubcaption = "Match ended"
+        case .draft:
+            layout.trailingCaption = "DARTS 301"
+            layout.trailingSubcaption = "Preparing"
+        case .expired:
+            layout.trailingCaption = "DARTS 301"
+            layout.trailingSubcaption = "Expired"
+        }
+    }
+
     private static func subtitle(for payload: PingoMessagePayload) -> String {
         if payload.match.gameID == .eightBall {
             switch payload.action {
@@ -206,6 +246,28 @@ enum PingoMessageFactory {
                 return payload.match.series?.completed == true ? "Series complete • see the result" : "Shootout complete • see the result"
             case .rematch:
                 return "Fresh shootout • next game ready"
+            }
+        }
+
+        if payload.match.gameID == .darts {
+            let state = try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)
+            switch payload.action {
+            case .challenge:
+                if let series = payload.match.series {
+                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
+                }
+                return "@\(payload.sender.username) challenged you to Darts 301"
+            case .accepted:
+                return "Oche ready • first visit is live"
+            case .turn:
+                let score = state?.lastVisitScore ?? 0
+                return score > 0 ? "Visit \(score) • your turn" : "No score • your turn"
+            case .resigned:
+                return "@\(payload.sender.username) ended the match"
+            case .completed:
+                return payload.match.series?.completed == true ? "Series complete • see the result" : "Checkout complete • see the result"
+            case .rematch:
+                return "Fresh leg • next game ready"
             }
         }
 
