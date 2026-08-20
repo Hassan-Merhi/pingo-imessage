@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Bowling Phase 2 native controls 2026-08-20
+# Rebuild marker: Bowling Phase 3 physics animations 2026-08-20
 
 on:
   workflow_dispatch:
