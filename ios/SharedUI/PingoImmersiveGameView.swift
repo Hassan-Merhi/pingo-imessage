@@ -101,7 +101,19 @@ struct PingoImmersiveGameView: View {
                     onMove: onPhysicsMove
                 )
 
-            case .bowling, .penaltyShootout, .archery, .airHockey, .miniRacing:
+            case .bowling:
+                if let state = extraState {
+                    PingoBowlingPhase1View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        onMove: onExtraMove
+                    )
+                } else {
+                    fallbackStage
+                }
+
+            case .penaltyShootout, .archery, .airHockey, .miniRacing:
                 if let state = extraState {
                     PingoImmersiveArcadeView(
                         gameID: match.gameID,
