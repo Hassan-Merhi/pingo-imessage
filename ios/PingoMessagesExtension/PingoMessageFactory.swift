@@ -16,6 +16,8 @@ enum PingoMessageFactory {
             layout.image = PingoBasketballMessagePreviewRenderer.image(payload: payload)
         } else if payload.match.gameID == .darts {
             layout.image = PingoDartsMessagePreviewRenderer.image(payload: payload)
+        } else if payload.match.gameID == .miniGolf {
+            layout.image = PingoMiniGolfMessagePreviewRenderer.image(payload: payload)
         } else if let game {
             layout.image = PingoMessagePreviewRenderer.image(for: game, payload: payload)
         }
@@ -28,6 +30,8 @@ enum PingoMessageFactory {
             configureBasketballTrailing(layout: layout, payload: payload)
         } else if payload.match.gameID == .darts {
             configureDartsTrailing(layout: layout, payload: payload)
+        } else if payload.match.gameID == .miniGolf {
+            configureMiniGolfTrailing(layout: layout, payload: payload)
         } else if let series = payload.match.series {
             layout.trailingCaption = series.format.title
             layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
@@ -117,7 +121,6 @@ enum PingoMessageFactory {
         let senderScore = scores.indices.contains(senderIndex) ? scores[senderIndex] : 0
         let opponentScore = scores.indices.contains(opponentIndex) ? scores[opponentIndex] : 0
         let senderAttempts = attempts.indices.contains(senderIndex) ? attempts[senderIndex] : 0
-        let opponentAttempts = attempts.indices.contains(opponentIndex) ? attempts[opponentIndex] : 0
         let attemptsPerPlayer = state?.attemptsPerPlayer ?? 5
 
         if let series = payload.match.series {
@@ -131,7 +134,7 @@ enum PingoMessageFactory {
             layout.trailingCaption = "BASKETBALL"
             layout.trailingSubcaption = "5 shots • Challenge"
         case .active:
-            layout.trailingCaption = state?.lastPoints == 3 ? "SWISH +3" : state?.lastPoints == 2 ? "BUCKET +2" : (senderAttempts + opponentAttempts > 0 ? "MISS" : "BASKETBALL")
+            layout.trailingCaption = state?.lastPoints == 3 ? "SWISH +3" : state?.lastPoints == 2 ? "BUCKET +2" : (senderAttempts + (attempts.indices.contains(opponentIndex) ? attempts[opponentIndex] : 0) > 0 ? "MISS" : "BASKETBALL")
             layout.trailingSubcaption = "You \(senderScore) • Them \(opponentScore) • \(senderAttempts)/\(attemptsPerPlayer)"
         case .completed:
             layout.trailingCaption = "BASKETBALL"
@@ -184,24 +187,53 @@ enum PingoMessageFactory {
         }
     }
 
+    private static func configureMiniGolfTrailing(layout: MSMessageTemplateLayout, payload: PingoMessagePayload) {
+        let state = try? PingoPhysicsGameEngine.miniGolfState(from: payload.match.gameState)
+        let senderIndex = payload.match.players.firstIndex(where: { $0.id == payload.sender.id }) ?? 0
+        let opponentIndex = senderIndex == 0 ? 1 : 0
+        let senderTotal = value(state?.totals, senderIndex) + value(state?.holeStrokes, senderIndex)
+        let opponentTotal = value(state?.totals, opponentIndex) + value(state?.holeStrokes, opponentIndex)
+        let hole = min(max((state?.holeIndex ?? 0) + 1, 1), PingoMiniGolf.course.count)
+
+        if let series = payload.match.series {
+            layout.trailingCaption = "MINI GOLF • \(series.format.title)"
+            layout.trailingSubcaption = "\(seriesGameLabel(payload.match)) • \(series.scoreText)"
+            return
+        }
+
+        switch payload.match.status {
+        case .awaitingOpponent:
+            layout.trailingCaption = "MINI GOLF"
+            layout.trailingSubcaption = "9 holes • Challenge"
+        case .active:
+            layout.trailingCaption = state?.lastAutoFinished == true ? "STROKE LIMIT" : "HOLE \(hole)/\(PingoMiniGolf.course.count)"
+            layout.trailingSubcaption = "You \(senderTotal) • Them \(opponentTotal)"
+        case .completed:
+            layout.trailingCaption = "MINI GOLF"
+            layout.trailingSubcaption = "Final \(senderTotal)–\(opponentTotal)"
+        case .resigned:
+            layout.trailingCaption = "MINI GOLF"
+            layout.trailingSubcaption = "Match ended"
+        case .draft:
+            layout.trailingCaption = "MINI GOLF"
+            layout.trailingSubcaption = "Preparing"
+        case .expired:
+            layout.trailingCaption = "MINI GOLF"
+            layout.trailingSubcaption = "Expired"
+        }
+    }
+
     private static func subtitle(for payload: PingoMessagePayload) -> String {
         if payload.match.gameID == .eightBall {
             switch payload.action {
             case .challenge:
-                if let series = payload.match.series {
-                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
-                }
+                if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
                 return "@\(payload.sender.username) challenged you to 8 Ball"
-            case .accepted:
-                return "Table ready • @\(payload.sender.username) joined"
-            case .turn:
-                return "Shot sent • open the table"
-            case .resigned:
-                return "@\(payload.sender.username) ended the match"
-            case .completed:
-                return payload.match.series?.completed == true ? "Series complete • see the result" : "Rack complete • see the result"
-            case .rematch:
-                return "New rack ready"
+            case .accepted: return "Table ready • @\(payload.sender.username) joined"
+            case .turn: return "Shot sent • open the table"
+            case .resigned: return "@\(payload.sender.username) ended the match"
+            case .completed: return payload.match.series?.completed == true ? "Series complete • see the result" : "Rack complete • see the result"
+            case .rematch: return "New rack ready"
             }
         }
 
@@ -209,20 +241,13 @@ enum PingoMessageFactory {
             let state = try? PingoPhysicsGameEngine.cupPongState(from: payload.match.gameState)
             switch payload.action {
             case .challenge:
-                if let series = payload.match.series {
-                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
-                }
+                if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
                 return "@\(payload.sender.username) challenged you to Cup Pong"
-            case .accepted:
-                return "Table ready • first throw is live"
-            case .turn:
-                return state?.lastCup == nil ? "Miss • your throw" : "Cup sunk • your throw"
-            case .resigned:
-                return "@\(payload.sender.username) ended the match"
-            case .completed:
-                return payload.match.series?.completed == true ? "Series complete • see the result" : "Last cup down • see the result"
-            case .rematch:
-                return "Fresh cups • next game ready"
+            case .accepted: return "Table ready • first throw is live"
+            case .turn: return state?.lastCup == nil ? "Miss • your throw" : "Cup sunk • your throw"
+            case .resigned: return "@\(payload.sender.username) ended the match"
+            case .completed: return payload.match.series?.completed == true ? "Series complete • see the result" : "Last cup down • see the result"
+            case .rematch: return "Fresh cups • next game ready"
             }
         }
 
@@ -230,22 +255,16 @@ enum PingoMessageFactory {
             let state = try? PingoPhysicsGameEngine.basketballState(from: payload.match.gameState)
             switch payload.action {
             case .challenge:
-                if let series = payload.match.series {
-                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
-                }
+                if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
                 return "@\(payload.sender.username) challenged you to Basketball"
-            case .accepted:
-                return "Court ready • first shot is live"
+            case .accepted: return "Court ready • first shot is live"
             case .turn:
                 if state?.lastPoints == 3 { return "Swish +3 • your shot" }
                 if state?.lastPoints == 2 { return "Bucket +2 • your shot" }
                 return "Miss • your shot"
-            case .resigned:
-                return "@\(payload.sender.username) ended the match"
-            case .completed:
-                return payload.match.series?.completed == true ? "Series complete • see the result" : "Shootout complete • see the result"
-            case .rematch:
-                return "Fresh shootout • next game ready"
+            case .resigned: return "@\(payload.sender.username) ended the match"
+            case .completed: return payload.match.series?.completed == true ? "Series complete • see the result" : "Shootout complete • see the result"
+            case .rematch: return "Fresh shootout • next game ready"
             }
         }
 
@@ -253,29 +272,35 @@ enum PingoMessageFactory {
             let state = try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)
             switch payload.action {
             case .challenge:
-                if let series = payload.match.series {
-                    return "@\(payload.sender.username) challenged you • \(series.format.title)"
-                }
+                if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
                 return "@\(payload.sender.username) challenged you to Darts 301"
-            case .accepted:
-                return "Oche ready • first visit is live"
+            case .accepted: return "Oche ready • first visit is live"
             case .turn:
                 let score = state?.lastVisitScore ?? 0
                 return score > 0 ? "Visit \(score) • your turn" : "No score • your turn"
-            case .resigned:
-                return "@\(payload.sender.username) ended the match"
-            case .completed:
-                return payload.match.series?.completed == true ? "Series complete • see the result" : "Checkout complete • see the result"
-            case .rematch:
-                return "Fresh leg • next game ready"
+            case .resigned: return "@\(payload.sender.username) ended the match"
+            case .completed: return payload.match.series?.completed == true ? "Series complete • see the result" : "Checkout complete • see the result"
+            case .rematch: return "Fresh leg • next game ready"
+            }
+        }
+
+        if payload.match.gameID == .miniGolf {
+            let state = try? PingoPhysicsGameEngine.miniGolfState(from: payload.match.gameState)
+            switch payload.action {
+            case .challenge:
+                if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
+                return "@\(payload.sender.username) challenged you to Mini Golf"
+            case .accepted: return "Course ready • first putt is live"
+            case .turn: return state?.lastAutoFinished == true ? "Stroke limit reached • your putt" : "Putt sent • your turn"
+            case .resigned: return "@\(payload.sender.username) ended the match"
+            case .completed: return payload.match.series?.completed == true ? "Series complete • see the result" : "Course complete • see the result"
+            case .rematch: return "Fresh course • next round ready"
             }
         }
 
         switch payload.action {
         case .challenge:
-            if let series = payload.match.series {
-                return "@\(payload.sender.username) challenged you • \(series.format.title)"
-            }
+            if let series = payload.match.series { return "@\(payload.sender.username) challenged you • \(series.format.title)" }
             return "@\(payload.sender.username) challenged you"
         case .accepted: return "@\(payload.sender.username) accepted"
         case .turn: return "@\(payload.sender.username) made a move"
@@ -290,17 +315,13 @@ enum PingoMessageFactory {
     private static func summary(for payload: PingoMessagePayload, gameName: String) -> String {
         switch payload.action {
         case .challenge:
-            if let series = payload.match.series {
-                return "Pingo \(gameName) \(series.format.title) challenge from @\(payload.sender.username)"
-            }
+            if let series = payload.match.series { return "Pingo \(gameName) \(series.format.title) challenge from @\(payload.sender.username)" }
             return "Pingo \(gameName) challenge from @\(payload.sender.username)"
         case .accepted: return "@\(payload.sender.username) accepted the Pingo \(gameName) challenge"
         case .turn: return "New Pingo \(gameName) move from @\(payload.sender.username)"
         case .resigned: return "@\(payload.sender.username) resigned the Pingo \(gameName) match"
         case .completed:
-            return payload.match.series?.completed == true
-                ? "Pingo \(gameName) series completed"
-                : "Pingo \(gameName) match completed"
+            return payload.match.series?.completed == true ? "Pingo \(gameName) series completed" : "Pingo \(gameName) match completed"
         case .rematch: return "Next Pingo \(gameName) series game from @\(payload.sender.username)"
         }
     }
@@ -314,5 +335,10 @@ enum PingoMessageFactory {
             number = series.gameNumber
         }
         return "Game \(number)"
+    }
+
+    private static func value(_ values: [Int]?, _ index: Int) -> Int {
+        guard let values, values.indices.contains(index) else { return 0 }
+        return values[index]
     }
 }
