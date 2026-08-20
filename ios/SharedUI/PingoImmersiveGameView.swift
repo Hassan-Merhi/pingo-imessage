@@ -103,7 +103,7 @@ struct PingoImmersiveGameView: View {
 
             case .bowling:
                 if let state = extraState {
-                    PingoBowlingPhase1View(
+                    PingoBowlingPhase2View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
