@@ -137,7 +137,19 @@ struct PingoImmersiveGameView: View {
                     fallbackStage
                 }
 
-            case .airHockey, .miniRacing:
+            case .airHockey:
+                if let state = extraState {
+                    PingoAirHockeyPhase1View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        onMove: onExtraMove
+                    )
+                } else {
+                    fallbackStage
+                }
+
+            case .miniRacing:
                 if let state = extraState {
                     PingoImmersiveArcadeView(
                         gameID: match.gameID,
