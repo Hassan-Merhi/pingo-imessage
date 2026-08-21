@@ -115,7 +115,7 @@ struct PingoImmersiveGameView: View {
 
             case .penaltyShootout:
                 if let state = extraState {
-                    PingoPenaltyShootoutPhase2View(
+                    PingoPenaltyShootoutPhase3View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
