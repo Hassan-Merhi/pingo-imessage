@@ -29,7 +29,10 @@ struct PingoPenaltyShootoutPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoPenaltyShootoutFeedback.kickReleased()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -63,6 +66,23 @@ struct PingoPenaltyShootoutPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoPenaltyShootoutFeedback.prepare()
+        }
+        .onChange(of: state.lastScore) { newScore in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            PingoPenaltyShootoutFeedback.kickResolved(goal: newScore > 0)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoPenaltyShootoutFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoPenaltyShootoutFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog(
