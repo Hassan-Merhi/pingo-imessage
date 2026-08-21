@@ -29,7 +29,10 @@ struct PingoBowlingPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoBowlingFeedback.rollReleased()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -63,6 +66,23 @@ struct PingoBowlingPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoBowlingFeedback.prepare()
+        }
+        .onChange(of: state.lastScore) { newScore in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            PingoBowlingFeedback.rollResolved(pins: newScore)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoBowlingFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoBowlingFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog(
