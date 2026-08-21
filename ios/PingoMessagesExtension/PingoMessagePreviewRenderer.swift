@@ -4,6 +4,10 @@ import UIKit
 @MainActor
 enum PingoMessagePreviewRenderer {
     static func image(for game: PingoGameDescriptor, payload: PingoMessagePayload) -> UIImage {
+        if game.id == .bowling {
+            return PingoBowlingMessagePreviewRenderer.image(payload: payload)
+        }
+
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
