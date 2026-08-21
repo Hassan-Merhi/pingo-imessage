@@ -8,7 +8,8 @@ struct PingoAirHockeyPhase1View: View {
     let onMove: (PingoExtraGameMove) -> Void
 
     @State private var lane = 50.0
-    @State private var power = 75.0
+    @State private var livePower = 0.0
+    @State private var isAiming = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -20,7 +21,7 @@ struct PingoAirHockeyPhase1View: View {
             statusRibbon
 
             if canMove {
-                controls
+                gestureHint
             }
         }
         .padding(.horizontal, 10)
@@ -75,7 +76,7 @@ struct PingoAirHockeyPhase1View: View {
 
                 VStack {
                     HStack {
-                        Text("ARCADE TABLE")
+                        Text(isAiming ? "POWER \(Int(livePower.rounded()))" : "ARCADE TABLE")
                             .font(.system(size: 9, weight: .black, design: .rounded))
                             .tracking(0.8)
                             .foregroundStyle(.white.opacity(0.72))
@@ -88,6 +89,8 @@ struct PingoAirHockeyPhase1View: View {
                 }
                 .padding(18)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .gesture(airHockeyShotGesture(size: size))
         }
     }
 
@@ -140,13 +143,18 @@ struct PingoAirHockeyPhase1View: View {
     }
 
     private func mallets(size: CGSize) -> some View {
-        ZStack {
+        let playerY = size.height * (0.24 + CGFloat(lane / 100) * 0.52)
+
+        return ZStack {
             mallet(color: .pink)
-                .position(x: size.width * 0.26, y: size.height * 0.50)
+                .scaleEffect(isAiming ? 1.08 : 1)
+                .position(x: size.width * 0.26, y: canMove ? playerY : size.height * 0.50)
 
             mallet(color: .cyan)
                 .position(x: size.width * 0.74, y: size.height * 0.50)
         }
+        .animation(.easeOut(duration: 0.12), value: lane)
+        .animation(.easeOut(duration: 0.12), value: isAiming)
     }
 
     private func mallet(color: Color) -> some View {
@@ -165,7 +173,9 @@ struct PingoAirHockeyPhase1View: View {
     }
 
     private func puck(size: CGSize) -> some View {
-        ZStack {
+        let y = size.height * (0.24 + CGFloat(lane / 100) * 0.52)
+
+        return ZStack {
             Circle()
                 .fill(Color.black.opacity(0.88))
                 .frame(width: 28, height: 28)
@@ -174,13 +184,14 @@ struct PingoAirHockeyPhase1View: View {
                 .stroke(Color.white.opacity(0.18), lineWidth: 1)
                 .frame(width: 20, height: 20)
         }
-        .position(x: size.width * 0.42, y: size.height * 0.50)
+        .position(x: size.width * 0.42, y: canMove ? y : size.height * 0.50)
+        .animation(.easeOut(duration: 0.12), value: lane)
     }
 
     private func aimGuide(size: CGSize) -> some View {
-        let start = CGPoint(x: size.width * 0.43, y: size.height * 0.50)
-        let laneOffset = CGFloat((lane - 50) / 50) * size.height * 0.22
-        let end = CGPoint(x: size.width * 0.87, y: size.height * 0.50 + laneOffset)
+        let y = size.height * (0.24 + CGFloat(lane / 100) * 0.52)
+        let start = CGPoint(x: size.width * 0.43, y: y)
+        let end = CGPoint(x: size.width * 0.87, y: y)
 
         return ZStack {
             Path { path in
@@ -222,25 +233,67 @@ struct PingoAirHockeyPhase1View: View {
         .background(Color.white.opacity(0.72), in: Capsule())
     }
 
-    private var controls: some View {
-        VStack(spacing: 9) {
-            valueRow(title: "Lane", value: lane)
-            Slider(value: $lane, in: 0...100, step: 1)
-                .tint(.pingoPrimary)
-
-            valueRow(title: "Power", value: power)
-            Slider(value: $power, in: 0...100, step: 1)
-                .tint(.pingoPrimary)
-
-            Button("Shoot Puck") {
-                onMove(.init(primary: Int(lane.rounded()), secondary: Int(power.rounded())))
+    private var gestureHint: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.draw.fill")
+                .font(.caption)
+                .foregroundStyle(Color.pingoPrimary)
+            Text(isAiming ? "Release with a rightward flick to shoot" : "Drag to aim • Flick right to shoot")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.black.opacity(0.56))
+            Spacer()
+            if isAiming {
+                Text("\(Int(livePower.rounded()))%")
+                    .font(.caption.monospacedDigit().weight(.black))
+                    .foregroundStyle(Color.pingoPrimary)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.pingoPrimary)
-            .frame(maxWidth: .infinity)
         }
-        .padding(12)
-        .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func airHockeyShotGesture(size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .local)
+            .onChanged { value in
+                guard canMove else { return }
+                lane = laneValue(for: value.location.y, height: size.height)
+                livePower = powerValue(for: value.translation.width, width: size.width)
+                isAiming = true
+            }
+            .onEnded { value in
+                guard canMove else {
+                    isAiming = false
+                    livePower = 0
+                    return
+                }
+
+                lane = laneValue(for: value.location.y, height: size.height)
+
+                let dx = value.translation.width
+                let dy = abs(value.translation.height)
+                let isForwardFlick = dx >= max(44, size.width * 0.12) && dx > dy * 0.65
+                let power = Int(powerValue(for: dx, width: size.width).rounded())
+
+                if isForwardFlick {
+                    onMove(.init(primary: Int(lane.rounded()), secondary: max(20, power)))
+                }
+
+                isAiming = false
+                livePower = 0
+            }
+    }
+
+    private func laneValue(for y: CGFloat, height: CGFloat) -> Double {
+        guard height > 0 else { return 50 }
+        let normalized = Double(y / height) * 100
+        return min(100, max(0, normalized))
+    }
+
+    private func powerValue(for horizontalDistance: CGFloat, width: CGFloat) -> Double {
+        guard width > 0 else { return 0 }
+        let normalized = Double(max(0, horizontalDistance) / max(width * 0.45, 1)) * 100
+        return min(100, max(0, normalized))
     }
 
     private func scoreChip(title: String, score: Int, attempts: Int, emphasized: Bool) -> some View {
@@ -260,22 +313,11 @@ struct PingoAirHockeyPhase1View: View {
         .background(emphasized ? Color.pingoPrimary.opacity(0.16) : Color.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func valueRow(title: String, value: Double) -> some View {
-        HStack {
-            Text(title)
-                .font(.caption.weight(.semibold))
-            Spacer()
-            Text("\(Int(value.rounded()))")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var statusText: String {
         if !state.lastSummary.isEmpty {
             return state.lastSummary
         }
-        return canMove ? "Line up the puck and take your shot." : "Table locked while the turn changes."
+        return canMove ? "Slide the mallet into your lane and flick the puck." : "Table locked while the turn changes."
     }
 
     private func score(_ index: Int) -> Int {
