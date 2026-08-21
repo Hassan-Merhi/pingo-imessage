@@ -7,6 +7,9 @@ enum PingoMessagePreviewRenderer {
         if game.id == .bowling {
             return PingoBowlingMessagePreviewRenderer.image(payload: payload)
         }
+        if game.id == .penaltyShootout {
+            return PingoPenaltyShootoutMessagePreviewRenderer.image(payload: payload)
+        }
 
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()
