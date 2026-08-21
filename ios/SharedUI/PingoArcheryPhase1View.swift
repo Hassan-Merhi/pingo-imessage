@@ -9,6 +9,8 @@ struct PingoArcheryPhase1View: View {
 
     @State private var horizontal = 50.0
     @State private var vertical = 50.0
+    @State private var hasLockedAim = false
+    @State private var isAiming = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -82,6 +84,8 @@ struct PingoArcheryPhase1View: View {
                 }
                 .padding(22)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .gesture(archeryGesture(size: size))
         }
     }
 
@@ -176,11 +180,11 @@ struct PingoArcheryPhase1View: View {
                 path.move(to: CGPoint(x: size.width / 2, y: size.height * 0.87))
                 path.addLine(to: point)
             }
-            .stroke(Color.white.opacity(0.62), style: StrokeStyle(lineWidth: 2, dash: [6, 7]))
+            .stroke(Color.white.opacity(hasLockedAim || isAiming ? 0.72 : 0.42), style: StrokeStyle(lineWidth: 2, dash: [6, 7]))
 
             Circle()
-                .stroke(Color.white.opacity(0.95), lineWidth: 2)
-                .frame(width: 42, height: 42)
+                .stroke(Color.white.opacity(0.95), lineWidth: isAiming ? 3 : 2)
+                .frame(width: isAiming ? 48 : 42, height: isAiming ? 48 : 42)
                 .position(point)
 
             Path { path in
@@ -193,9 +197,10 @@ struct PingoArcheryPhase1View: View {
 
             Circle()
                 .fill(Color.pingoPrimary)
-                .frame(width: 9, height: 9)
+                .frame(width: isAiming ? 11 : 9, height: isAiming ? 11 : 9)
                 .position(point)
         }
+        .animation(.easeOut(duration: 0.12), value: isAiming)
         .allowsHitTesting(false)
     }
 
@@ -252,39 +257,80 @@ struct PingoArcheryPhase1View: View {
     }
 
     private var controls: some View {
-        VStack(spacing: 10) {
-            sliderRow(label: "Horizontal", value: $horizontal)
-            sliderRow(label: "Vertical", value: $vertical)
+        HStack(spacing: 10) {
+            Image(systemName: hasLockedAim ? "arrow.up.circle.fill" : "scope")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Color.pingoPrimary)
 
-            Button {
-                onMove(.init(primary: Int(horizontal.rounded()), secondary: Int(vertical.rounded())))
-            } label: {
-                Label("Shoot Arrow", systemImage: "scope")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Color.pingoPrimary, in: Capsule())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(hasLockedAim ? "FLICK UP TO SHOOT" : "DRAG ON THE TARGET TO AIM")
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .tracking(0.45)
+                    .foregroundStyle(.black.opacity(0.66))
+                Text(hasLockedAim ? "Drag again anytime to refine your aim." : "Release to lock the reticle, then flick upward.")
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.black.opacity(0.42))
             }
-            .buttonStyle(.plain)
+
+            Spacer()
+
+            if hasLockedAim {
+                Text("\(Int(horizontal.rounded())) · \(Int(vertical.rounded()))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.black.opacity(0.44))
+            }
         }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .background(Color.white.opacity(0.46), in: Capsule())
     }
 
-    private func sliderRow(label: String, value: Binding<Double>) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.black.opacity(0.56))
-                Spacer()
-                Text("\(Int(value.wrappedValue.rounded()))")
-                    .font(.caption.monospacedDigit().weight(.bold))
-                    .foregroundStyle(.black.opacity(0.50))
-            }
+    private func archeryGesture(size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard canMove else { return }
+                isAiming = true
 
-            Slider(value: value, in: 0...100, step: 1)
-                .tint(Color.pingoPrimary)
-        }
+                // Once the user commits to an upward release, preserve the locked
+                // reticle instead of dragging it away from the intended target.
+                if value.translation.height > -28 {
+                    updateAim(location: value.location, size: size)
+                }
+            }
+            .onEnded { value in
+                guard canMove else {
+                    isAiming = false
+                    return
+                }
+
+                let isReleaseFlick = value.translation.height <= -36
+                if isReleaseFlick, hasLockedAim {
+                    isAiming = false
+                    onMove(
+                        .init(
+                            primary: Int(horizontal.rounded()),
+                            secondary: Int(vertical.rounded())
+                        )
+                    )
+                    return
+                }
+
+                updateAim(location: value.location, size: size)
+                hasLockedAim = true
+                isAiming = false
+            }
+    }
+
+    private func updateAim(location: CGPoint, size: CGSize) {
+        let diameter = min(size.width * 0.58, size.height * 0.57)
+        let radius = max(1, diameter * 0.42)
+        let center = CGPoint(x: size.width / 2, y: size.height * 0.39)
+
+        let x = min(max(location.x, center.x - radius), center.x + radius)
+        let y = min(max(location.y, center.y - radius), center.y + radius)
+
+        horizontal = min(max(50 + Double((x - center.x) / radius) * 50, 0), 100)
+        vertical = min(max(50 + Double((y - center.y) / radius) * 50, 0), 100)
     }
 
     private func aimPoint(size: CGSize) -> CGPoint {
