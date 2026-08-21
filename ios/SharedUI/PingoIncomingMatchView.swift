@@ -64,9 +64,10 @@ struct PingoIncomingMatchView: View {
     private var isDarts: Bool { payload.match.gameID == .darts }
     private var isMiniGolf: Bool { payload.match.gameID == .miniGolf }
     private var isBowling: Bool { payload.match.gameID == .bowling }
+    private var isPenaltyShootout: Bool { payload.match.gameID == .penaltyShootout }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout
     }
 
     var body: some View {
@@ -147,6 +148,20 @@ struct PingoIncomingMatchView: View {
                 } else if isBowling, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
                     PingoBowlingPhase4View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        match: payload.match,
+                        localProfile: localProfile,
+                        onMove: onExtraMove,
+                        onResign: onResign,
+                        onContinueSeries: onContinueSeries,
+                        onRematch: onRematch
+                    )
+                    .padding(.top, 66)
+                } else if isPenaltyShootout, let index = localPlayerIndex {
+                    let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
+                    PingoPenaltyShootoutPhase4View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
