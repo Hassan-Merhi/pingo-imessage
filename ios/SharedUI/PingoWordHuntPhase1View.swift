@@ -112,7 +112,8 @@ struct PingoWordHuntPhase1View: View {
         HStack(spacing: 8) {
             Image(systemName: isResolvingWord ? "sparkles" : "hand.draw.fill")
                 .font(.caption.bold())
-                .symbolEffect(.pulse, value: isResolvingWord)
+                .scaleEffect(confirmationPulse ? 1.12 : 1)
+                .animation(.easeInOut(duration: 0.2), value: confirmationPulse)
             Text(isResolvingWord ? "LOCKING WORD" : "BOARD \(state.challengeIndex + 1)")
                 .font(.caption2.weight(.black))
                 .tracking(0.8)
@@ -213,6 +214,16 @@ struct PingoWordHuntPhase1View: View {
 
     private func resolutionOverlay(_ board: PingoWordHuntBoard) -> some View {
         let word = selectedWord(board)
+        let burstOffsets: [CGSize] = [
+            .init(width: 0, height: -76),
+            .init(width: 58, height: -54),
+            .init(width: 84, height: 0),
+            .init(width: 58, height: 54),
+            .init(width: 0, height: 76),
+            .init(width: -58, height: 54),
+            .init(width: -84, height: 0),
+            .init(width: -58, height: -54)
+        ]
 
         return ZStack {
             Color.black.opacity(0.20)
@@ -221,10 +232,7 @@ struct PingoWordHuntPhase1View: View {
                 Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
                     .font(.system(size: index.isMultiple(of: 3) ? 15 : 10, weight: .bold))
                     .foregroundStyle(index.isMultiple(of: 2) ? Color.white : Color.pingoPrimary)
-                    .offset(
-                        x: sparkleBurst ? cos(Double(index) * .pi / 4) * 88 : 0,
-                        y: sparkleBurst ? sin(Double(index) * .pi / 4) * 78 : 0
-                    )
+                    .offset(sparkleBurst ? burstOffsets[index] : .zero)
                     .opacity(sparkleBurst ? 0 : 1)
                     .scaleEffect(sparkleBurst ? 0.7 : 1.15)
                     .animation(.easeOut(duration: 0.52).delay(Double(index) * 0.012), value: sparkleBurst)
