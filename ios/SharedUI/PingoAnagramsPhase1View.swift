@@ -7,7 +7,7 @@ struct PingoAnagramsPhase1View: View {
     let canMove: Bool
     let onMove: (PingoExtraGameMove) -> Void
 
-    @State private var answer = ""
+    @State private var selectedIndices: [Int] = []
 
     var body: some View {
         let prompt = PingoExtraGameEngine.anagramPrompt(for: state)
@@ -24,7 +24,7 @@ struct PingoAnagramsPhase1View: View {
 
                 letterRack(prompt)
 
-                Text("Rearrange every letter to solve the word")
+                Text("Tap the letters in the order that spells your answer")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.black.opacity(0.42))
                     .multilineTextAlignment(.center)
@@ -53,10 +53,13 @@ struct PingoAnagramsPhase1View: View {
             }
             .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
 
-            answerBar
+            answerBar(prompt)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+        .onChange(of: state.challengeIndex) { _ in
+            selectedIndices.removeAll()
+        }
     }
 
     private var scoreStrip: some View {
@@ -113,34 +116,50 @@ struct PingoAnagramsPhase1View: View {
         let letters = Array(prompt.uppercased())
         return HStack(spacing: 7) {
             ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white, Color(red: 1.0, green: 0.93, blue: 0.78)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .stroke(Color.orange.opacity(0.18), lineWidth: 1)
+                let selectionPosition = selectedIndices.firstIndex(of: index)
+                Button {
+                    guard canMove else { return }
+                    if let selectionPosition {
+                        if selectionPosition == selectedIndices.count - 1 {
+                            selectedIndices.removeLast()
                         }
-                        .shadow(color: .black.opacity(0.09), radius: 3, y: 2)
+                    } else {
+                        selectedIndices.append(index)
+                    }
+                } label: {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: selectionPosition == nil
+                                        ? [Color.white, Color(red: 1.0, green: 0.93, blue: 0.78)]
+                                        : [Color.pingoPrimary.opacity(0.92), Color.pingoPrimary.opacity(0.72)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .stroke(selectionPosition == nil ? Color.orange.opacity(0.18) : Color.white.opacity(0.8), lineWidth: 1)
+                            }
+                            .shadow(color: .black.opacity(0.09), radius: 3, y: 2)
 
-                    Text(String(letter))
-                        .font(.system(size: 25, weight: .black, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.76))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Text(String(letter))
+                            .font(.system(size: 25, weight: .black, design: .rounded))
+                            .foregroundStyle(selectionPosition == nil ? .black.opacity(0.76) : .white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    Text("\(index + 1)")
-                        .font(.system(size: 7, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.16))
-                        .padding(5)
+                        Text(selectionPosition.map { "\($0 + 1)" } ?? "")
+                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(5)
+                    }
+                    .frame(maxWidth: 52)
+                    .aspectRatio(0.82, contentMode: .fit)
                 }
-                .frame(maxWidth: 52)
-                .aspectRatio(0.82, contentMode: .fit)
-                .accessibilityLabel("Letter \(letter), tile \(index + 1)")
+                .buttonStyle(.plain)
+                .disabled(!canMove)
+                .accessibilityLabel(selectionPosition == nil ? "Letter \(letter)" : "Letter \(letter), selected \((selectionPosition ?? 0) + 1)")
             }
         }
         .frame(maxWidth: .infinity)
@@ -160,23 +179,44 @@ struct PingoAnagramsPhase1View: View {
     }
 
     @ViewBuilder
-    private var answerBar: some View {
+    private func answerBar(_ prompt: String) -> some View {
         if canMove {
+            let letters = Array(prompt.uppercased())
+            let answer = String(selectedIndices.compactMap { letters.indices.contains($0) ? letters[$0] : nil })
+
             HStack(spacing: 8) {
-                TextField("TYPE YOUR ANSWER", text: $answer)
-                    .textFieldStyle(.plain)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .font(.headline.weight(.bold))
-                    .padding(.horizontal, 14)
-                    .frame(height: 46)
-                    .background(Color.white.opacity(0.92), in: Capsule())
+                HStack(spacing: 8) {
+                    Button {
+                        if !selectedIndices.isEmpty { selectedIndices.removeLast() }
+                    } label: {
+                        Image(systemName: "delete.left.fill")
+                    }
+                    .disabled(selectedIndices.isEmpty)
+                    .accessibilityLabel("Undo last letter")
+
+                    Text(answer.isEmpty ? "TAP LETTERS" : answer)
+                        .font(.headline.weight(.black))
+                        .tracking(1.0)
+                        .foregroundStyle(answer.isEmpty ? .black.opacity(0.28) : .black.opacity(0.74))
+                        .frame(maxWidth: .infinity)
+
+                    Button {
+                        selectedIndices.removeAll()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .disabled(selectedIndices.isEmpty)
+                    .accessibilityLabel("Clear answer")
+                }
+                .foregroundStyle(.black.opacity(0.52))
+                .padding(.horizontal, 12)
+                .frame(height: 46)
+                .background(Color.white.opacity(0.92), in: Capsule())
 
                 Button {
-                    let submitted = answer.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !submitted.isEmpty else { return }
-                    onMove(.init(text: submitted))
-                    answer = ""
+                    guard !answer.isEmpty else { return }
+                    onMove(.init(text: answer))
+                    selectedIndices.removeAll()
                 } label: {
                     Image(systemName: "paperplane.fill")
                         .font(.headline.bold())
@@ -185,7 +225,7 @@ struct PingoAnagramsPhase1View: View {
                         .background(Color.pingoPrimary, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(answer.isEmpty)
                 .accessibilityLabel("Submit anagram answer")
             }
         } else {
