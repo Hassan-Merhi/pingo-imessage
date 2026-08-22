@@ -16,6 +16,9 @@ enum PingoMessagePreviewRenderer {
         if game.id == .airHockey {
             return PingoAirHockeyMessagePreviewRenderer.image(payload: payload)
         }
+        if game.id == .wordHunt {
+            return PingoWordHuntMessagePreviewRenderer.image(payload: payload)
+        }
 
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()
@@ -37,13 +40,10 @@ enum PingoMessagePreviewRenderer {
         let colors = palette(for: game).map { $0.cgColor } as CFArray
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1])
-
         context.saveGState()
         let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 34)
         path.addClip()
-        if let gradient {
-            context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: size.width, y: size.height), options: [])
-        }
+        if let gradient { context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: size.width, y: size.height), options: []) }
         context.setFillColor(UIColor.black.withAlphaComponent(0.18).cgColor)
         context.fill(CGRect(x: 0, y: size.height - 92, width: size.width, height: 92))
         context.restoreGState()
@@ -59,35 +59,22 @@ enum PingoMessagePreviewRenderer {
     private static func drawEightBallCard(in context: CGContext, size: CGSize, payload: PingoMessagePayload) {
         let tableRect = CGRect(x: 48, y: 30, width: size.width - 96, height: 238)
         let outerShadow = UIBezierPath(roundedRect: tableRect.offsetBy(dx: 0, dy: 8), cornerRadius: 28)
-        UIColor.black.withAlphaComponent(0.24).setFill()
-        outerShadow.fill()
-
+        UIColor.black.withAlphaComponent(0.24).setFill(); outerShadow.fill()
         let rail = UIBezierPath(roundedRect: tableRect, cornerRadius: 28)
-        UIColor(red: 0.24, green: 0.085, blue: 0.045, alpha: 1).setFill()
-        rail.fill()
-
+        UIColor(red: 0.24, green: 0.085, blue: 0.045, alpha: 1).setFill(); rail.fill()
         let railHighlight = UIBezierPath(roundedRect: tableRect.insetBy(dx: 7, dy: 7), cornerRadius: 22)
-        UIColor(red: 0.48, green: 0.22, blue: 0.10, alpha: 1).setStroke()
-        railHighlight.lineWidth = 5
-        railHighlight.stroke()
-
+        UIColor(red: 0.48, green: 0.22, blue: 0.10, alpha: 1).setStroke(); railHighlight.lineWidth = 5; railHighlight.stroke()
         let feltRect = tableRect.insetBy(dx: 25, dy: 25)
         let felt = UIBezierPath(roundedRect: feltRect, cornerRadius: 14)
-        UIColor(red: 0.015, green: 0.43, blue: 0.38, alpha: 1).setFill()
-        felt.fill()
-
+        UIColor(red: 0.015, green: 0.43, blue: 0.38, alpha: 1).setFill(); felt.fill()
         let pocketCenters = [CGPoint(x: feltRect.minX, y: feltRect.minY), CGPoint(x: feltRect.midX, y: feltRect.minY), CGPoint(x: feltRect.maxX, y: feltRect.minY), CGPoint(x: feltRect.minX, y: feltRect.maxY), CGPoint(x: feltRect.midX, y: feltRect.maxY), CGPoint(x: feltRect.maxX, y: feltRect.maxY)]
         for center in pocketCenters {
-            UIColor.black.withAlphaComponent(0.42).setFill()
-            context.fillEllipse(in: CGRect(x: center.x - 14, y: center.y - 14, width: 28, height: 28))
-            UIColor.black.setFill()
-            context.fillEllipse(in: CGRect(x: center.x - 10, y: center.y - 10, width: 20, height: 20))
+            UIColor.black.withAlphaComponent(0.42).setFill(); context.fillEllipse(in: CGRect(x: center.x - 14, y: center.y - 14, width: 28, height: 28))
+            UIColor.black.setFill(); context.fillEllipse(in: CGRect(x: center.x - 10, y: center.y - 10, width: 20, height: 20))
         }
-
         let state = (try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)) ?? PingoEightBallState()
         let visibleBalls = state.balls.filter { !$0.pocketed }
         for ball in visibleBalls { drawPoolBall(ball.id, at: poolPoint(ball.position, in: feltRect), in: context) }
-
         if payload.match.status == .active, let cue = visibleBalls.first(where: { $0.id == 0 }) {
             let cuePoint = poolPoint(cue.position, in: feltRect)
             context.saveGState(); context.setStrokeColor(UIColor.white.withAlphaComponent(0.34).cgColor); context.setLineWidth(2); context.setLineDash(phase: 0, lengths: [8, 8]); context.move(to: cuePoint); context.addLine(to: CGPoint(x: min(feltRect.maxX - 8, cuePoint.x + 110), y: cuePoint.y)); context.strokePath(); context.restoreGState()

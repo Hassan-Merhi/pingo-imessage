@@ -25,7 +25,15 @@ struct PingoWordHuntPhase4View: View {
 
     var body: some View {
         ZStack {
-            PingoWordHuntPhase1View(state: state, player: player, canMove: canMove && match.status == .active, onMove: onMove)
+            PingoWordHuntPhase1View(
+                state: state,
+                player: player,
+                canMove: canMove && match.status == .active,
+                onMove: { move in
+                    PingoWordHuntFeedback.wordSubmitted()
+                    onMove(move)
+                }
+            )
 
             VStack(spacing: 0) {
                 statusRibbon
@@ -46,6 +54,23 @@ struct PingoWordHuntPhase4View: View {
                 centeredState(symbol: "hourglass", eyebrow: "BOARD LOCKED", title: "Opponent’s turn", detail: "Your letter board stays locked until their word is submitted.")
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoWordHuntFeedback.prepare()
+        }
+        .onChange(of: state.lastScore) { newScore in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            PingoWordHuntFeedback.wordResolved(points: newScore)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoWordHuntFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoWordHuntFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog("Resign this Word Hunt match?", isPresented: $showResignConfirmation, titleVisibility: .visible) {
@@ -157,9 +182,7 @@ struct PingoWordHuntPhase4View: View {
         return localWon ? "Word Hunt victory" : "Opponent won the hunt"
     }
 
-    private func score(_ index: Int) -> Int {
-        state.scores.indices.contains(index) ? state.scores[index] : 0
-    }
+    private func score(_ index: Int) -> Int { state.scores.indices.contains(index) ? state.scores[index] : 0 }
 }
 
 private struct WordHuntPhase4PrimaryButtonStyle: ButtonStyle {
