@@ -8,6 +8,10 @@ struct PingoAnagramsPhase1View: View {
     let onMove: (PingoExtraGameMove) -> Void
 
     @State private var selectedIndices: [Int] = []
+    @State private var isResolving = false
+    @State private var rackPulse = false
+    @State private var confirmationScale: CGFloat = 0.86
+    @State private var resolutionMessage: String?
 
     var body: some View {
         let prompt = PingoExtraGameEngine.anagramPrompt(for: state)
@@ -23,11 +27,28 @@ struct PingoAnagramsPhase1View: View {
                     .foregroundStyle(.black.opacity(0.42))
 
                 letterRack(prompt)
+                    .scaleEffect(rackPulse ? 1.025 : 1)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.55), value: rackPulse)
 
-                Text("Tap the letters in the order that spells your answer")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.42))
-                    .multilineTextAlignment(.center)
+                if let resolutionMessage {
+                    HStack(spacing: 7) {
+                        Image(systemName: "sparkles")
+                        Text(resolutionMessage)
+                    }
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .tracking(1.1)
+                    .foregroundStyle(Color.pingoPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.88), in: Capsule())
+                    .scaleEffect(confirmationScale)
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    Text("Tap the letters in the order that spells your answer")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.black.opacity(0.42))
+                        .multilineTextAlignment(.center)
+                }
 
                 if !state.lastSummary.isEmpty {
                     lastResult
@@ -49,7 +70,11 @@ struct PingoAnagramsPhase1View: View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.white.opacity(0.88), lineWidth: 1)
+                    .stroke(
+                        isResolving ? Color.pingoPrimary.opacity(0.55) : Color.white.opacity(0.88),
+                        lineWidth: isResolving ? 2 : 1
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: isResolving)
             }
             .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
 
@@ -59,6 +84,9 @@ struct PingoAnagramsPhase1View: View {
         .padding(.bottom, 8)
         .onChange(of: state.challengeIndex) { _ in
             selectedIndices.removeAll()
+            isResolving = false
+            resolutionMessage = nil
+            rackPulse = false
         }
     }
 
@@ -97,19 +125,20 @@ struct PingoAnagramsPhase1View: View {
 
     private var roundBanner: some View {
         HStack(spacing: 8) {
-            Image(systemName: "textformat.abc")
+            Image(systemName: isResolving ? "hourglass.circle.fill" : "textformat.abc")
                 .font(.caption.bold())
-            Text("PUZZLE \(state.challengeIndex + 1)")
+            Text(isResolving ? "CHECKING ANSWER" : "PUZZLE \(state.challengeIndex + 1)")
                 .font(.caption2.weight(.black))
                 .tracking(0.8)
             Spacer()
             Text("\(state.attempts.indices.contains(player) ? state.attempts[player] : 0) ATTEMPTS")
                 .font(.caption2.weight(.black).monospacedDigit())
         }
-        .foregroundStyle(.black.opacity(0.54))
+        .foregroundStyle(isResolving ? Color.pingoPrimary : .black.opacity(0.54))
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(Color.white.opacity(0.58), in: Capsule())
+        .animation(.easeInOut(duration: 0.2), value: isResolving)
     }
 
     private func letterRack(_ prompt: String) -> some View {
@@ -118,13 +147,17 @@ struct PingoAnagramsPhase1View: View {
             ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
                 let selectionPosition = selectedIndices.firstIndex(of: index)
                 Button {
-                    guard canMove else { return }
+                    guard canMove, !isResolving else { return }
                     if let selectionPosition {
                         if selectionPosition == selectedIndices.count - 1 {
-                            selectedIndices.removeLast()
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
+                                selectedIndices.removeLast()
+                            }
                         }
                     } else {
-                        selectedIndices.append(index)
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
+                            selectedIndices.append(index)
+                        }
                     }
                 } label: {
                     ZStack(alignment: .topLeading) {
@@ -156,9 +189,13 @@ struct PingoAnagramsPhase1View: View {
                     }
                     .frame(maxWidth: 52)
                     .aspectRatio(0.82, contentMode: .fit)
+                    .scaleEffect(selectionPosition == nil ? 1 : (isResolving ? 1.06 : 1.03))
+                    .rotationEffect(.degrees(isResolving && selectionPosition != nil ? (index.isMultiple(of: 2) ? -2 : 2) : 0))
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: selectionPosition)
+                    .animation(.easeInOut(duration: 0.16).repeatCount(2, autoreverses: true), value: isResolving)
                 }
                 .buttonStyle(.plain)
-                .disabled(!canMove)
+                .disabled(!canMove || isResolving)
                 .accessibilityLabel(selectionPosition == nil ? "Letter \(letter)" : "Letter \(letter), selected \((selectionPosition ?? 0) + 1)")
             }
         }
@@ -187,11 +224,16 @@ struct PingoAnagramsPhase1View: View {
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Button {
-                        if !selectedIndices.isEmpty { selectedIndices.removeLast() }
+                        guard !isResolving else { return }
+                        if !selectedIndices.isEmpty {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                selectedIndices.removeLast()
+                            }
+                        }
                     } label: {
                         Image(systemName: "delete.left.fill")
                     }
-                    .disabled(selectedIndices.isEmpty)
+                    .disabled(selectedIndices.isEmpty || isResolving)
                     .accessibilityLabel("Undo last letter")
 
                     Text(answer.isEmpty ? "TAP LETTERS" : answer)
@@ -199,13 +241,17 @@ struct PingoAnagramsPhase1View: View {
                         .tracking(1.0)
                         .foregroundStyle(answer.isEmpty ? .black.opacity(0.28) : .black.opacity(0.74))
                         .frame(maxWidth: .infinity)
+                        .contentTransition(.numericText())
 
                     Button {
-                        selectedIndices.removeAll()
+                        guard !isResolving else { return }
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            selectedIndices.removeAll()
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                     }
-                    .disabled(selectedIndices.isEmpty)
+                    .disabled(selectedIndices.isEmpty || isResolving)
                     .accessibilityLabel("Clear answer")
                 }
                 .foregroundStyle(.black.opacity(0.52))
@@ -214,19 +260,19 @@ struct PingoAnagramsPhase1View: View {
                 .background(Color.white.opacity(0.92), in: Capsule())
 
                 Button {
-                    guard !answer.isEmpty else { return }
-                    onMove(.init(text: answer))
-                    selectedIndices.removeAll()
+                    submit(answer)
                 } label: {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: isResolving ? "sparkles" : "paperplane.fill")
                         .font(.headline.bold())
                         .foregroundStyle(.white)
                         .frame(width: 48, height: 46)
                         .background(Color.pingoPrimary, in: Circle())
+                        .scaleEffect(isResolving ? 1.08 : 1)
+                        .animation(.easeInOut(duration: 0.18).repeatCount(2, autoreverses: true), value: isResolving)
                 }
                 .buttonStyle(.plain)
-                .disabled(answer.isEmpty)
-                .accessibilityLabel("Submit anagram answer")
+                .disabled(answer.isEmpty || isResolving)
+                .accessibilityLabel(isResolving ? "Checking anagram answer" : "Submit anagram answer")
             }
         } else {
             HStack(spacing: 8) {
@@ -238,6 +284,29 @@ struct PingoAnagramsPhase1View: View {
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(Color.white.opacity(0.56), in: Capsule())
+        }
+    }
+
+    private func submit(_ answer: String) {
+        guard canMove, !isResolving, !answer.isEmpty else { return }
+
+        isResolving = true
+        resolutionMessage = "ANSWER LOCKED"
+        confirmationScale = 0.86
+
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.52)) {
+            rackPulse = true
+            confirmationScale = 1
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.58) {
+            onMove(.init(text: answer))
+            selectedIndices.removeAll()
+            withAnimation(.easeOut(duration: 0.18)) {
+                rackPulse = false
+                resolutionMessage = nil
+                isResolving = false
+            }
         }
     }
 
