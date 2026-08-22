@@ -151,8 +151,7 @@ struct PingoImmersiveGameView: View {
 
             case .miniRacing:
                 if let state = extraState {
-                    PingoImmersiveArcadeView(
-                        gameID: match.gameID,
+                    PingoMiniRacingPhase1View(
                         state: state,
                         player: index,
                         canMove: localCanMove,
