@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Air Hockey Phase 3 physics animations 2026-08-22
+# Rebuild marker: Archery Phase 5 iMessage polish and final validation 2026-08-22
 
 on:
   workflow_dispatch:
