@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Word Hunt Phase 1 visual game surface 2026-08-22
+# Rebuild marker: Air Hockey Phase 4 synchronized exact-head validation 2026-08-22
 
 on:
   workflow_dispatch:
