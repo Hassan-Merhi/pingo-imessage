@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Mini Racing Phase 5 iMessage polish 2026-08-22
+# Rebuild marker: Anagrams Phase 3 gameplay animations 2026-08-23
 
 on:
   workflow_dispatch:
