@@ -1,3 +1,4 @@
+import Foundation
 import PingoCore
 import SwiftUI
 
@@ -8,6 +9,9 @@ struct PingoWordHuntPhase1View: View {
     let onMove: (PingoExtraGameMove) -> Void
 
     @State private var selectedIndices: [Int] = []
+    @State private var isResolvingWord = false
+    @State private var confirmationPulse = false
+    @State private var sparkleBurst = false
 
     private let gridSpacing: CGFloat = 8
 
@@ -39,7 +43,18 @@ struct PingoWordHuntPhase1View: View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                    .stroke(
+                        isResolvingWord ? Color.pingoPrimary.opacity(0.75) : Color.white.opacity(0.9),
+                        lineWidth: isResolvingWord ? 3 : 1
+                    )
+                    .scaleEffect(confirmationPulse ? 1.015 : 1)
+                    .animation(.easeInOut(duration: 0.22), value: confirmationPulse)
+            }
+            .overlay {
+                if isResolvingWord {
+                    resolutionOverlay(board)
+                        .transition(.scale(scale: 0.86).combined(with: .opacity))
+                }
             }
             .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
             .frame(maxHeight: .infinity)
@@ -50,10 +65,12 @@ struct PingoWordHuntPhase1View: View {
         .padding(.bottom, 8)
         .onChange(of: state.challengeIndex) { _ in
             selectedIndices = []
+            isResolvingWord = false
         }
         .onChange(of: canMove) { newValue in
             if !newValue {
                 selectedIndices = []
+                isResolvingWord = false
             }
         }
     }
@@ -93,9 +110,11 @@ struct PingoWordHuntPhase1View: View {
 
     private var challengeBanner: some View {
         HStack(spacing: 8) {
-            Image(systemName: "hand.draw.fill")
+            Image(systemName: isResolvingWord ? "sparkles" : "hand.draw.fill")
                 .font(.caption.bold())
-            Text("BOARD \(state.challengeIndex + 1)")
+                .scaleEffect(confirmationPulse ? 1.12 : 1)
+                .animation(.easeInOut(duration: 0.2), value: confirmationPulse)
+            Text(isResolvingWord ? "LOCKING WORD" : "BOARD \(state.challengeIndex + 1)")
                 .font(.caption2.weight(.black))
                 .tracking(0.8)
             Spacer()
@@ -163,12 +182,18 @@ struct PingoWordHuntPhase1View: View {
                         x: CGFloat(column) * (tileSize + gridSpacing),
                         y: CGFloat(row) * (tileSize + gridSpacing)
                     )
+                    .scaleEffect(isResolvingWord && isSelected ? (confirmationPulse ? 1.09 : 0.94) : 1)
+                    .rotationEffect(.degrees(isResolvingWord && isSelected ? (confirmationPulse ? 2 : -2) : 0))
+                    .animation(
+                        .spring(response: 0.22, dampingFraction: 0.58).delay(Double(selectionOrder ?? 0) * 0.035),
+                        value: confirmationPulse
+                    )
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectTile(index)
                     }
                     .accessibilityLabel("Letter \(letter), tile \(index + 1)\(isSelected ? ", selected" : "")")
-                    .accessibilityHint(canMove ? "Tap to add this letter to your word" : "Waiting for your turn")
+                    .accessibilityHint(canMove && !isResolvingWord ? "Tap to add this letter to your word" : "Input is locked while the turn resolves")
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.width)
@@ -177,6 +202,7 @@ struct PingoWordHuntPhase1View: View {
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { value in
                         guard canMove,
+                              !isResolvingWord,
                               let index = tileIndex(at: value.location, width: proxy.size.width)
                         else { return }
                         selectTile(index)
@@ -184,6 +210,59 @@ struct PingoWordHuntPhase1View: View {
             )
         }
         .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func resolutionOverlay(_ board: PingoWordHuntBoard) -> some View {
+        let word = selectedWord(board)
+        let burstOffsets: [CGSize] = [
+            .init(width: 0, height: -76),
+            .init(width: 58, height: -54),
+            .init(width: 84, height: 0),
+            .init(width: 58, height: 54),
+            .init(width: 0, height: 76),
+            .init(width: -58, height: 54),
+            .init(width: -84, height: 0),
+            .init(width: -58, height: -54)
+        ]
+
+        return ZStack {
+            Color.black.opacity(0.20)
+
+            ForEach(0..<8, id: \.self) { index in
+                Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
+                    .font(.system(size: index.isMultiple(of: 3) ? 15 : 10, weight: .bold))
+                    .foregroundStyle(index.isMultiple(of: 2) ? Color.white : Color.pingoPrimary)
+                    .offset(sparkleBurst ? burstOffsets[index] : .zero)
+                    .opacity(sparkleBurst ? 0 : 1)
+                    .scaleEffect(sparkleBurst ? 0.7 : 1.15)
+                    .animation(.easeOut(duration: 0.52).delay(Double(index) * 0.012), value: sparkleBurst)
+            }
+
+            VStack(spacing: 5) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 30, weight: .black))
+                    .foregroundStyle(Color.pingoPrimary)
+                    .scaleEffect(confirmationPulse ? 1.12 : 0.86)
+
+                Text(word)
+                    .font(.system(size: 25, weight: .black, design: .rounded))
+                    .tracking(1)
+                    .foregroundStyle(.black.opacity(0.82))
+
+                Text("WORD FOUND")
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .tracking(1.4)
+                    .foregroundStyle(.black.opacity(0.45))
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .allowsHitTesting(true)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Word found, \(word). Sending turn.")
     }
 
     private var usedWords: some View {
@@ -209,52 +288,56 @@ struct PingoWordHuntPhase1View: View {
             let canonical = word.lowercased()
             let isValid = board.acceptedWords.contains(canonical) && !state.usedWords.contains(canonical)
 
-            VStack(spacing: 7) {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(word.isEmpty ? "TRACE A WORD" : word)
-                            .font(.headline.weight(.black))
-                            .foregroundStyle(word.isEmpty ? .black.opacity(0.35) : .black.opacity(0.78))
-                            .lineLimit(1)
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(isResolvingWord ? "WORD LOCKED" : (word.isEmpty ? "TRACE A WORD" : word))
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(word.isEmpty ? .black.opacity(0.35) : .black.opacity(0.78))
+                        .lineLimit(1)
 
-                        Text(word.isEmpty ? "Drag across letters or tap them in order" : (isValid ? "Valid word — ready to send" : "Keep tracing a valid board word"))
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(isValid ? Color.pingoPrimary : .black.opacity(0.38))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Button {
-                        selectedIndices = []
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.subheadline.bold())
-                            .frame(width: 42, height: 42)
-                            .background(Color.black.opacity(0.06), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.black.opacity(0.55))
-                    .disabled(selectedIndices.isEmpty)
-                    .accessibilityLabel("Clear selected word")
-
-                    Button {
-                        guard isValid else { return }
-                        onMove(.init(text: word))
-                        selectedIndices = []
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .font(.headline.bold())
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 46)
-                            .background(isValid ? Color.pingoPrimary : Color.black.opacity(0.16), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!isValid)
-                    .accessibilityLabel("Submit selected word")
+                    Text(
+                        isResolvingWord
+                            ? "Confirming your find…"
+                            : (word.isEmpty
+                                ? "Drag across letters or tap them in order"
+                                : (isValid ? "Valid word — ready to send" : "Keep tracing a valid board word"))
+                    )
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(isValid ? Color.pingoPrimary : .black.opacity(0.38))
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 54)
-                .background(Color.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    selectedIndices = []
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.subheadline.bold())
+                        .frame(width: 42, height: 42)
+                        .background(Color.black.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.black.opacity(0.55))
+                .disabled(selectedIndices.isEmpty || isResolvingWord)
+                .accessibilityLabel("Clear selected word")
+
+                Button {
+                    guard isValid, !isResolvingWord else { return }
+                    resolveWord(word)
+                } label: {
+                    Image(systemName: isResolvingWord ? "sparkles" : "paperplane.fill")
+                        .font(.headline.bold())
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 46)
+                        .background(isValid ? Color.pingoPrimary : Color.black.opacity(0.16), in: Circle())
+                        .scaleEffect(confirmationPulse ? 1.08 : 1)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isValid || isResolvingWord)
+                .accessibilityLabel("Submit selected word")
             }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 54)
+            .background(Color.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "hourglass")
@@ -268,8 +351,28 @@ struct PingoWordHuntPhase1View: View {
         }
     }
 
+    private func resolveWord(_ word: String) {
+        let move = PingoExtraGameMove(text: word)
+        isResolvingWord = true
+        sparkleBurst = false
+
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.58)) {
+            confirmationPulse.toggle()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
+            sparkleBurst = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.68) {
+            guard isResolvingWord else { return }
+            onMove(move)
+            selectedIndices = []
+            isResolvingWord = false
+            sparkleBurst = false
+        }
+    }
+
     private func selectTile(_ index: Int) {
-        guard canMove, (0..<16).contains(index) else { return }
+        guard canMove, !isResolvingWord, (0..<16).contains(index) else { return }
         if selectedIndices.last == index { return }
 
         if let existing = selectedIndices.firstIndex(of: index) {
