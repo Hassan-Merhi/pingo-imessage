@@ -67,10 +67,11 @@ struct PingoIncomingMatchView: View {
     private var isPenaltyShootout: Bool { payload.match.gameID == .penaltyShootout }
     private var isArchery: Bool { payload.match.gameID == .archery }
     private var isAirHockey: Bool { payload.match.gameID == .airHockey }
+    private var isMiniRacing: Bool { payload.match.gameID == .miniRacing }
     private var isWordHunt: Bool { payload.match.gameID == .wordHunt }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isWordHunt
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isMiniRacing || isWordHunt
     }
 
     var body: some View {
@@ -113,6 +114,10 @@ struct PingoIncomingMatchView: View {
                 } else if isAirHockey, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
                     PingoAirHockeyPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
+                } else if isMiniRacing, let index = localPlayerIndex {
+                    let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
+                    PingoMiniRacingPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
                         .padding(.top, 66)
                 } else if isWordHunt, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
@@ -221,7 +226,7 @@ struct PingoIncomingMatchView: View {
                     Text("WAITING FOR OPPONENT.")
                         .font(.title3.bold())
                         .foregroundStyle(.black.opacity(0.78))
-                    Text("The challenge is ready. The other person can open the newest Pingo card to join.")
+                    Text("The challenge is ready. The other person can open the newest Pingo card to join the race.")
                         .font(.subheadline)
                         .foregroundStyle(.black.opacity(0.52))
                         .multilineTextAlignment(.center)
