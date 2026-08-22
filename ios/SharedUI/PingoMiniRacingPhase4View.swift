@@ -29,7 +29,10 @@ struct PingoMiniRacingPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoMiniRacingFeedback.raceStarted()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -63,6 +66,21 @@ struct PingoMiniRacingPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoMiniRacingFeedback.prepare()
+        }
+        .onChange(of: match.revision) { _ in
+            guard match.status == .active else { return }
+            PingoMiniRacingFeedback.runResolved()
+            if canMove {
+                PingoMiniRacingFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoMiniRacingFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog(
