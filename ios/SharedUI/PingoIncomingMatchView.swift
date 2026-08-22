@@ -66,9 +66,10 @@ struct PingoIncomingMatchView: View {
     private var isBowling: Bool { payload.match.gameID == .bowling }
     private var isPenaltyShootout: Bool { payload.match.gameID == .penaltyShootout }
     private var isArchery: Bool { payload.match.gameID == .archery }
+    private var isAirHockey: Bool { payload.match.gameID == .airHockey }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey
     }
 
     var body: some View {
@@ -78,125 +79,43 @@ struct PingoIncomingMatchView: View {
             if shouldShowGame {
                 if isEightBall, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.eightBallState(from: payload.match.gameState)) ?? PingoEightBallState()
-                    PingoEightBallPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onPhysicsMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoEightBallPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onPhysicsMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isCupPong, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.cupPongState(from: payload.match.gameState)) ?? PingoCupPongState()
-                    PingoCupPongPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onPhysicsMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoCupPongPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onPhysicsMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isBasketball, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.basketballState(from: payload.match.gameState)) ?? PingoBasketballState()
-                    PingoBasketballPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onPhysicsMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoBasketballPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onPhysicsMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isDarts, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.dartsState(from: payload.match.gameState)) ?? PingoDartsState()
-                    PingoDartsPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onPhysicsMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoDartsPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onPhysicsMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isMiniGolf, let index = localPlayerIndex {
                     let state = (try? PingoPhysicsGameEngine.miniGolfState(from: payload.match.gameState)) ?? PingoMiniGolfState()
-                    PingoMiniGolfPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onPhysicsMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoMiniGolfPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onPhysicsMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isBowling, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
-                    PingoBowlingPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onExtraMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoBowlingPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isPenaltyShootout, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
-                    PingoPenaltyShootoutPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onExtraMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoPenaltyShootoutPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else if isArchery, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
-                    PingoArcheryPhase4View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMove: onExtraMove,
-                        onResign: onResign,
-                        onContinueSeries: onContinueSeries,
-                        onRematch: onRematch
-                    )
-                    .padding(.top, 66)
+                    PingoArcheryPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
+                } else if isAirHockey, let index = localPlayerIndex {
+                    let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
+                    PingoAirHockeyPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
                 } else {
-                    PingoImmersiveGameView(
-                        match: payload.match,
-                        localProfile: localProfile,
-                        onMoves: onMoves,
-                        onPhysicsMove: onPhysicsMove,
-                        onExtraMove: onExtraMove
-                    )
-                    .padding(.top, 66)
+                    PingoImmersiveGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves, onPhysicsMove: onPhysicsMove, onExtraMove: onExtraMove)
+                        .padding(.top, 66)
                 }
             } else {
                 nonGameState
@@ -277,13 +196,7 @@ struct PingoIncomingMatchView: View {
 
             ZStack {
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.pingoPrimary, Color.pingoSecondary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(LinearGradient(colors: [Color.pingoPrimary, Color.pingoSecondary], startPoint: .topLeading, endPoint: .bottomTrailing))
                 Text(game?.symbol ?? "🎮")
                     .font(.system(size: 84))
             }
