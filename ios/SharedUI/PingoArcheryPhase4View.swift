@@ -29,7 +29,10 @@ struct PingoArcheryPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoArcheryFeedback.arrowReleased()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -63,6 +66,23 @@ struct PingoArcheryPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoArcheryFeedback.prepare()
+        }
+        .onChange(of: state.lastScore) { newScore in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            PingoArcheryFeedback.arrowResolved(score: newScore)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoArcheryFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoArcheryFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog(
