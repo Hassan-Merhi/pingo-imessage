@@ -11,6 +11,10 @@ struct PingoMiniRacingPhase1View: View {
     @State private var throttle = 72.0
     @State private var dragStart: CGPoint?
     @State private var isDriving = false
+    @State private var isRaceAnimating = false
+    @State private var animatedProgress: Double?
+    @State private var impactPulse = false
+    @State private var raceFeedback = ""
 
     private var opponent: Int { 1 - player }
 
@@ -22,9 +26,11 @@ struct PingoMiniRacingPhase1View: View {
                 .frame(maxWidth: .infinity)
                 .aspectRatio(1.36, contentMode: .fit)
                 .contentShape(Rectangle())
-                .gesture(canMove ? drivingGesture : nil)
+                .gesture(canMove && !isRaceAnimating ? drivingGesture : nil)
 
-            if !state.lastSummary.isEmpty {
+            if !raceFeedback.isEmpty {
+                raceFeedbackBanner
+            } else if !state.lastSummary.isEmpty {
                 resultBanner
             }
 
@@ -38,7 +44,7 @@ struct PingoMiniRacingPhase1View: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            distanceChip(title: "YOU", distance: progress(player), emphasized: true)
+            distanceChip(title: "YOU", distance: displayedPlayerProgress, emphasized: true)
             VStack(spacing: 2) {
                 Text("MINI RACING")
                     .font(.system(size: 14, weight: .black, design: .rounded))
@@ -123,14 +129,21 @@ struct PingoMiniRacingPhase1View: View {
                     .frame(width: 13, height: roadHeight * 0.88)
                     .position(x: roadX + roadWidth * 0.90, y: roadTop + roadHeight / 2)
 
+                if isRaceAnimating {
+                    speedLines(width: roadWidth * 0.44, height: roadHeight * 0.34)
+                        .position(x: carX(progress: Double(displayedPlayerProgress), roadX: roadX, roadWidth: roadWidth) - roadWidth * 0.22, y: playerY)
+                        .transition(.opacity)
+                }
+
                 car(color: Color(red: 0.87, green: 0.20, blue: 0.17), label: "RIVAL")
-                    .position(x: carX(progress: progress(opponent), roadX: roadX, roadWidth: roadWidth), y: opponentY)
+                    .position(x: carX(progress: Double(progress(opponent)), roadX: roadX, roadWidth: roadWidth), y: opponentY)
 
                 car(color: Color.pingoPrimary, label: "YOU")
-                    .position(x: carX(progress: progress(player), roadX: roadX, roadWidth: roadWidth), y: playerY)
-                    .shadow(color: Color.pingoPrimary.opacity(0.38), radius: 7, x: -2)
+                    .scaleEffect(impactPulse ? 1.10 : 1)
+                    .position(x: carX(progress: animatedProgress ?? Double(progress(player)), roadX: roadX, roadWidth: roadWidth), y: playerY)
+                    .shadow(color: Color.pingoPrimary.opacity(isRaceAnimating ? 0.58 : 0.38), radius: isRaceAnimating ? 11 : 7, x: -2)
 
-                if canMove {
+                if canMove && !isRaceAnimating {
                     VStack(spacing: 2) {
                         Image(systemName: "hand.draw.fill")
                             .font(.system(size: 16, weight: .bold))
@@ -144,9 +157,32 @@ struct PingoMiniRacingPhase1View: View {
                     .background(.black.opacity(0.52), in: Capsule())
                     .position(x: width / 2, y: height * 0.91)
                 }
+
+                if isRaceAnimating {
+                    Text("RACING")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .tracking(1.2)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.58), in: Capsule())
+                        .position(x: width / 2, y: height * 0.91)
+                }
             }
             .clipped()
         }
+    }
+
+    private func speedLines(width: CGFloat, height: CGFloat) -> some View {
+        ZStack {
+            ForEach(0..<5, id: \.self) { index in
+                Capsule()
+                    .fill(.white.opacity(0.22 + Double(index) * 0.06))
+                    .frame(width: width * (0.44 + CGFloat(index) * 0.08), height: 2)
+                    .offset(y: (CGFloat(index) - 2) * height * 0.18)
+            }
+        }
+        .frame(width: width, height: height)
     }
 
     private var finishLine: some View {
@@ -193,10 +229,24 @@ struct PingoMiniRacingPhase1View: View {
         .background(Color.pingoPrimary.opacity(0.09), in: Capsule())
     }
 
+    private var raceFeedbackBanner: some View {
+        HStack(spacing: 7) {
+            Image(systemName: raceFeedback == "FULL THROTTLE" ? "bolt.fill" : "steeringwheel")
+                .font(.caption.bold())
+            Text(raceFeedback)
+                .font(.caption.weight(.heavy))
+                .tracking(0.5)
+        }
+        .foregroundStyle(Color.pingoPrimary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 7)
+        .background(Color.pingoPrimary.opacity(0.09), in: Capsule())
+    }
+
     private var controlsHint: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("DIRECT DRIVE")
+                Text(isRaceAnimating ? "RACE IN PROGRESS" : "DIRECT DRIVE")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .tracking(0.8)
                 Text("Steering \(steeringLabel)  •  Throttle \(Int(throttle.rounded()))%")
@@ -204,7 +254,7 @@ struct PingoMiniRacingPhase1View: View {
                     .foregroundStyle(.black.opacity(0.48))
             }
             Spacer()
-            Image(systemName: "arrow.up.circle.fill")
+            Image(systemName: isRaceAnimating ? "speedometer" : "arrow.up.circle.fill")
                 .font(.title2)
                 .foregroundStyle(Color.pingoPrimary)
         }
@@ -231,8 +281,42 @@ struct PingoMiniRacingPhase1View: View {
                 let finalThrottle = min(100, max(35, Int((45 + Double(upward) * 0.55).rounded())))
                 let finalSteering = min(100, max(0, Int(steering.rounded())))
                 throttle = Double(finalThrottle)
-                onMove(.init(primary: finalThrottle, secondary: finalSteering))
+                beginRaceAnimation(move: .init(primary: finalThrottle, secondary: finalSteering))
             }
+    }
+
+    private func beginRaceAnimation(move: PingoExtraGameMove) {
+        guard !isRaceAnimating else { return }
+
+        let start = Double(progress(player))
+        let lineError = abs(Double(move.secondary) - 50)
+        let visualGain = max(4, min(18, Double(move.primary) * 0.16 - lineError * 0.055))
+        let target = min(100, start + visualGain)
+
+        animatedProgress = start
+        raceFeedback = move.primary >= 88 ? "FULL THROTTLE" : (lineError <= 8 ? "CLEAN LINE" : "PUSHING HARD")
+        isRaceAnimating = true
+
+        withAnimation(.easeInOut(duration: 0.88)) {
+            animatedProgress = target
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.88) {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.55)) {
+                impactPulse = true
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.08) {
+            impactPulse = false
+            onMove(move)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.28) {
+            isRaceAnimating = false
+            raceFeedback = ""
+            animatedProgress = nil
+        }
     }
 
     private func progress(_ index: Int) -> Int {
@@ -240,12 +324,16 @@ struct PingoMiniRacingPhase1View: View {
         return min(100, max(0, value))
     }
 
+    private var displayedPlayerProgress: Int {
+        Int((animatedProgress ?? Double(progress(player))).rounded())
+    }
+
     private var runNumber: Int {
         guard state.attempts.indices.contains(player) else { return 1 }
         return min(8, max(1, state.attempts[player] + 1))
     }
 
-    private func carX(progress: Int, roadX: CGFloat, roadWidth: CGFloat) -> CGFloat {
+    private func carX(progress: Double, roadX: CGFloat, roadWidth: CGFloat) -> CGFloat {
         roadX + roadWidth * (0.08 + 0.82 * CGFloat(progress) / 100)
     }
 
