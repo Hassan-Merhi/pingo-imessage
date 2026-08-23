@@ -25,6 +25,9 @@ enum PingoMessagePreviewRenderer {
         if game.id == .reactionBattle {
             return PingoReactionBattleMessagePreviewRenderer.image(payload: payload)
         }
+        if game.id == .drawAndGuess {
+            return PingoDrawGuessMessagePreviewRenderer.image(payload: payload)
+        }
 
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()
