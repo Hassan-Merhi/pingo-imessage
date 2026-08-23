@@ -10,6 +10,7 @@ struct PingoReactionBattlePhase1View: View {
 
     @State private var reactionPhase = 0
     @State private var readyAt: Date?
+    @State private var isTouchingArena = false
 
     private var localIndex: Int {
         match.players.firstIndex(where: { $0.id == localProfile.id }) ?? 0
@@ -118,10 +119,14 @@ struct PingoReactionBattlePhase1View: View {
             .padding(.vertical, 20)
         }
         .frame(minHeight: 285)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .gesture(reactionGesture)
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(lightColor.opacity(reactionPhase == 2 ? 0.8 : 0.22), lineWidth: reactionPhase == 2 ? 2 : 1)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityHint(canMove && match.status == .active ? "Press and hold the arena. Lift your finger when the signal turns yellow." : "")
     }
 
     private var reactionLight: some View {
@@ -136,7 +141,7 @@ struct PingoReactionBattlePhase1View: View {
                 .fill(lightColor)
                 .frame(width: 58, height: 58)
                 .shadow(color: lightColor.opacity(reactionPhase == 2 ? 0.8 : 0.3), radius: reactionPhase == 2 ? 22 : 8)
-            Image(systemName: reactionPhase == 2 ? "bolt.fill" : reactionPhase == 1 ? "hourglass" : "hand.tap.fill")
+            Image(systemName: reactionPhase == 2 ? "bolt.fill" : reactionPhase == 1 ? "hand.point.up.left.fill" : "hand.tap.fill")
                 .font(.system(size: 25, weight: .bold))
                 .foregroundStyle(reactionPhase == 2 ? Color.black : Color.white)
         }
@@ -150,40 +155,38 @@ struct PingoReactionBattlePhase1View: View {
         } else if !canMove {
             statusPill("WAITING FOR OPPONENT")
         } else if reactionPhase == 0 {
-            Button("ARM REACTION TEST") {
-                startReaction()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.pingoPrimary)
-            .controlSize(.large)
+            controlPill(icon: "hand.tap.fill", text: "PRESS & HOLD")
         } else if reactionPhase == 1 {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .tint(.white)
-                Text("HOLD…")
-                    .font(.subheadline.bold())
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 11)
-            .background(Color.white.opacity(0.08), in: Capsule())
+            controlPill(icon: "hand.point.up.left.fill", text: "KEEP HOLDING…")
         } else {
-            Button {
-                finishReaction()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "bolt.fill")
-                    Text("TAP NOW")
-                }
-                .font(.title3.weight(.black))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.yellow)
-            .foregroundStyle(.black)
-            .controlSize(.large)
+            controlPill(icon: "arrow.up.circle.fill", text: "LIFT NOW", highlighted: true)
         }
+    }
+
+    private var reactionGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard canMove, match.status == .active else { return }
+                guard !isTouchingArena else { return }
+                isTouchingArena = true
+                if reactionPhase == 0 {
+                    startReaction()
+                }
+            }
+            .onEnded { _ in
+                guard isTouchingArena else { return }
+                isTouchingArena = false
+                guard canMove, match.status == .active else {
+                    resetReactionState()
+                    return
+                }
+
+                if reactionPhase == 2 {
+                    finishReaction()
+                } else if reactionPhase == 1 {
+                    resetReactionState()
+                }
+            }
     }
 
     private var roundStrip: some View {
@@ -260,6 +263,19 @@ struct PingoReactionBattlePhase1View: View {
             .background(Color.white.opacity(0.08), in: Capsule())
     }
 
+    private func controlPill(icon: String, text: String, highlighted: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.subheadline.weight(.black))
+        .tracking(0.8)
+        .foregroundStyle(highlighted ? Color.black : Color.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+        .background(highlighted ? Color.yellow : Color.white.opacity(0.09), in: Capsule())
+    }
+
     private var localName: String {
         match.players.indices.contains(localIndex) ? "@\(match.players[localIndex].displayName)" : "You"
     }
@@ -279,7 +295,7 @@ struct PingoReactionBattlePhase1View: View {
     private var arenaTitle: String {
         if match.status != .active { return "FINAL RESULT" }
         if !canMove { return "Stand By" }
-        if reactionPhase == 1 { return "Don’t Tap Yet" }
+        if reactionPhase == 1 { return "Hold Steady" }
         if reactionPhase == 2 { return "GO!" }
         return "Ready?"
     }
@@ -287,9 +303,9 @@ struct PingoReactionBattlePhase1View: View {
     private var arenaSubtitle: String {
         if match.status != .active { return "The five-run reaction duel has finished." }
         if !canMove { return "Your opponent is completing their reaction run." }
-        if reactionPhase == 1 { return "Wait for the signal. Tapping early does not submit a run." }
-        if reactionPhase == 2 { return "Hit the signal as fast as you can." }
-        return "Arm the test, wait for the random signal, then tap instantly."
+        if reactionPhase == 1 { return "Keep your finger down until the signal turns yellow." }
+        if reactionPhase == 2 { return "Lift your finger now. Your release time is your reaction score." }
+        return "Press and hold anywhere in the arena, wait for the random signal, then lift instantly."
     }
 
     private var lightColor: Color {
@@ -305,7 +321,7 @@ struct PingoReactionBattlePhase1View: View {
         readyAt = nil
         let delay = PingoExtraGameEngine.reactionDelayMilliseconds(for: state)
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(delay) / 1000.0) {
-            guard reactionPhase == 1 else { return }
+            guard reactionPhase == 1, isTouchingArena else { return }
             readyAt = Date()
             reactionPhase = 2
         }
@@ -322,5 +338,6 @@ struct PingoReactionBattlePhase1View: View {
     private func resetReactionState() {
         reactionPhase = 0
         readyAt = nil
+        isTouchingArena = false
     }
 }

@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Anagrams Phase 4 match flow 2026-08-23
+# Rebuild marker: Reaction Battle Phase 2 native controls 2026-08-23
 
 on:
   workflow_dispatch:
