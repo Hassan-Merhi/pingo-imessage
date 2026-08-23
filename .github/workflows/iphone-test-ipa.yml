@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Reaction Battle Phase 3 gameplay feedback 2026-08-23
+# Rebuild marker: Trivia Phase 1 visual game surface 2026-08-23
 
 on:
   workflow_dispatch:
