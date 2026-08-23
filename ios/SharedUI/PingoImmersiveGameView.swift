@@ -187,7 +187,7 @@ struct PingoImmersiveGameView: View {
 
             case .reactionBattle:
                 if let state = extraState {
-                    PingoReactionBattlePhase1View(
+                    PingoReactionBattlePhase3View(
                         match: match,
                         localProfile: localProfile,
                         state: state,
