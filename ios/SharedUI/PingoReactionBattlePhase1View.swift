@@ -175,7 +175,7 @@ struct PingoReactionBattlePhase1View: View {
                     Image(systemName: "bolt.fill")
                     Text("TAP NOW")
                 }
-                .font(.title3.black())
+                .font(.title3.weight(.black))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
             }
@@ -223,7 +223,7 @@ struct PingoReactionBattlePhase1View: View {
                 .foregroundStyle(.white.opacity(0.82))
                 .lineLimit(1)
             Text("\(score)")
-                .font(.title2.black().monospacedDigit())
+                .font(.title2.weight(.black).monospacedDigit())
                 .foregroundStyle(.white)
             Text("\(min(5, attempts))/5 runs")
                 .font(.caption2.monospacedDigit())
