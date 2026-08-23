@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Draw & Guess Phase 5 iMessage polish 2026-08-24
+# Rebuild marker: Trivia Phase 5 iMessage polish and final testing 2026-08-24
 
 on:
   workflow_dispatch:
