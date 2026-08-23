@@ -30,7 +30,10 @@ struct PingoReactionBattlePhase4View: View {
                 localProfile: localProfile,
                 state: state,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoReactionBattleFeedback.runStarted()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -62,6 +65,21 @@ struct PingoReactionBattlePhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoReactionBattleFeedback.prepare()
+        }
+        .onChange(of: match.revision) { _ in
+            guard match.status == .active else { return }
+            PingoReactionBattleFeedback.runResolved()
+            if canMove {
+                PingoReactionBattleFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoReactionBattleFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog("Resign this Reaction Battle?", isPresented: $showResignConfirmation, titleVisibility: .visible) {
