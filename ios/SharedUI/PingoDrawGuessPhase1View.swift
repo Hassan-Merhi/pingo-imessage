@@ -8,7 +8,9 @@ struct PingoDrawGuessPhase1View: View {
     let onMove: (PingoExtraGameMove) -> Void
 
     @State private var drawing: [PingoExtraPoint] = []
+    @State private var strokeStarts: [Int] = []
     @State private var guess = ""
+    @FocusState private var guessFocused: Bool
 
     private var localScore: Int {
         state.scores.indices.contains(player) ? state.scores[player] : 0
@@ -127,7 +129,7 @@ struct PingoDrawGuessPhase1View: View {
     private var drawingStage: some View {
         VStack(spacing: 10) {
             ZStack(alignment: .topLeading) {
-                DrawGuessCanvas(points: $drawing, enabled: canMove)
+                DrawGuessCanvas(points: $drawing, strokeStarts: $strokeStarts, enabled: canMove)
 
                 HStack(spacing: 6) {
                     Label("INK", systemImage: "pencil.tip")
@@ -145,20 +147,32 @@ struct PingoDrawGuessPhase1View: View {
             if canMove {
                 HStack(spacing: 9) {
                     Button {
-                        drawing.removeAll()
+                        undoLastStroke()
                     } label: {
-                        Label("Clear", systemImage: "arrow.counterclockwise")
+                        Label("Undo", systemImage: "arrow.uturn.backward")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .frame(height: 44)
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, 10)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(strokeStarts.isEmpty)
+
+                    Button {
+                        drawing.removeAll()
+                        strokeStarts.removeAll()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 42, height: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Clear drawing")
                     .disabled(drawing.isEmpty)
 
                     Button {
-                        onMove(.init(points: drawing))
+                        submitDrawing()
                     } label: {
-                        Label("Send Drawing", systemImage: "paperplane.fill")
+                        Label("Send", systemImage: "paperplane.fill")
                             .font(.system(size: 14, weight: .heavy, design: .rounded))
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
@@ -167,6 +181,11 @@ struct PingoDrawGuessPhase1View: View {
                     .tint(.pingoPrimary)
                     .disabled(drawing.count < 2)
                 }
+
+                Label("Draw naturally with one finger. Each lift creates an undoable stroke.", systemImage: "hand.draw.fill")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.black.opacity(0.40))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -183,10 +202,11 @@ struct PingoDrawGuessPhase1View: View {
                     TextField("Type your guess", text: $guess)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .submitLabel(.send)
+                        .focused($guessFocused)
+                        .onSubmit(submitGuess)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    Button {
-                        onMove(.init(text: guess))
-                    } label: {
+                    Button(action: submitGuess) {
                         Image(systemName: "arrow.up")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
@@ -194,19 +214,50 @@ struct PingoDrawGuessPhase1View: View {
                             .background(Color.pingoPrimary, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(guess.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(trimmedGuess.isEmpty)
+                    .accessibilityLabel("Send guess")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Label("Use the keyboard Send key or the arrow to submit.", systemImage: "keyboard")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.black.opacity(0.40))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private var trimmedGuess: String {
+        guess.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func undoLastStroke() {
+        guard let start = strokeStarts.popLast() else { return }
+        guard drawing.indices.contains(start) || start == drawing.count else { return }
+        drawing.removeSubrange(start..<drawing.count)
+    }
+
+    private func submitDrawing() {
+        guard drawing.count >= 2 else { return }
+        onMove(.init(points: drawing))
+    }
+
+    private func submitGuess() {
+        let value = trimmedGuess
+        guard !value.isEmpty else { return }
+        guessFocused = false
+        onMove(.init(text: value))
     }
 }
 
 private struct DrawGuessCanvas: View {
     @Binding var points: [PingoExtraPoint]
+    @Binding var strokeStarts: [Int]
     let enabled: Bool
+
+    @State private var strokeInProgress = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -226,13 +277,22 @@ private struct DrawGuessCanvas: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         guard enabled, points.count < 160 else { return }
+                        if !strokeInProgress {
+                            strokeStarts.append(points.count)
+                            strokeInProgress = true
+                        }
                         let width = max(1, proxy.size.width)
                         let height = max(1, proxy.size.height)
                         let x = min(1000, max(0, Int(value.location.x / width * 1000)))
                         let y = min(1000, max(0, Int(value.location.y / height * 1000)))
                         points.append(.init(x: x, y: y))
                     }
+                    .onEnded { _ in
+                        strokeInProgress = false
+                    }
             )
+            .accessibilityLabel("Drawing canvas")
+            .accessibilityHint(enabled ? "Drag one finger to draw. Lift your finger to finish a stroke." : "Drawing is locked while waiting for your turn.")
         }
     }
 
