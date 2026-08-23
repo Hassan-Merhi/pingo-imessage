@@ -103,99 +103,43 @@ struct PingoImmersiveGameView: View {
 
             case .bowling:
                 if let state = extraState {
-                    PingoBowlingPhase3View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoBowlingPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .penaltyShootout:
                 if let state = extraState {
-                    PingoPenaltyShootoutPhase3View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoPenaltyShootoutPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .archery:
                 if let state = extraState {
-                    PingoArcheryPhase3View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoArcheryPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .airHockey:
                 if let state = extraState {
-                    PingoAirHockeyPhase3View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoAirHockeyPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .miniRacing:
                 if let state = extraState {
-                    PingoMiniRacingPhase1View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoMiniRacingPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .wordHunt:
                 if let state = extraState {
-                    PingoWordHuntPhase1View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoWordHuntPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .anagrams:
                 if let state = extraState {
-                    PingoAnagramsPhase1View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoAnagramsPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .trivia:
                 if let state = extraState {
-                    PingoTriviaPhase1View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoTriviaPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .reactionBattle:
                 if let state = extraState {
@@ -206,34 +150,17 @@ struct PingoImmersiveGameView: View {
                         canMove: localCanMove,
                         onMove: onExtraMove
                     )
-                } else {
-                    fallbackStage
-                }
+                } else { fallbackStage }
 
             case .drawAndGuess:
                 if let state = extraState {
-                    PingoDrawGuessPhase1View(
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoDrawGuessPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             case .crazyEights, .ludo:
                 if let state = extraState {
-                    PingoImmersivePartyView(
-                        gameID: match.gameID,
-                        state: state,
-                        player: index,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
-                } else {
-                    fallbackStage
-                }
+                    PingoImmersivePartyView(gameID: match.gameID, state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
 
             default:
                 fallbackStage
@@ -253,12 +180,8 @@ struct PingoImmersiveGameView: View {
             }
             .preferredColorScheme(.light)
         } else {
-            PingoImmersiveBoardStage(
-                match: match,
-                localProfile: localProfile,
-                onMoves: onMoves
-            )
-            .preferredColorScheme(.light)
+            PingoImmersiveBoardStage(match: match, localProfile: localProfile, onMoves: onMoves)
+                .preferredColorScheme(.light)
         }
     }
 
