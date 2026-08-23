@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Trivia Phase 3 gameplay animations and feedback 2026-08-23
+# Rebuild marker: Draw & Guess Phase 3 gameplay animations and feedback 2026-08-23
 
 on:
   workflow_dispatch:
