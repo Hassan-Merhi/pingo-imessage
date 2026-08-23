@@ -19,6 +19,9 @@ enum PingoMessagePreviewRenderer {
         if game.id == .wordHunt {
             return PingoWordHuntMessagePreviewRenderer.image(payload: payload)
         }
+        if game.id == .anagrams {
+            return PingoAnagramsMessagePreviewRenderer.image(payload: payload)
+        }
 
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()

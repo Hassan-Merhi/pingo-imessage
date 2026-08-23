@@ -29,7 +29,10 @@ struct PingoAnagramsPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoAnagramsFeedback.answerSubmitted()
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -61,6 +64,23 @@ struct PingoAnagramsPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoAnagramsFeedback.prepare()
+        }
+        .onChange(of: state.lastScore) { newScore in
+            guard state.attempts.reduce(0, +) > 0 else { return }
+            PingoAnagramsFeedback.answerResolved(points: newScore)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoAnagramsFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoAnagramsFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog("Resign this Anagrams match?", isPresented: $showResignConfirmation, titleVisibility: .visible) {
@@ -203,9 +223,7 @@ struct PingoAnagramsPhase4View: View {
         return localWon ? "Anagrams victory" : "Opponent won the puzzle"
     }
 
-    private func score(_ index: Int) -> Int {
-        state.scores.indices.contains(index) ? state.scores[index] : 0
-    }
+    private func score(_ index: Int) -> Int { state.scores.indices.contains(index) ? state.scores[index] : 0 }
 }
 
 private struct AnagramsPhase4PrimaryButtonStyle: ButtonStyle {
