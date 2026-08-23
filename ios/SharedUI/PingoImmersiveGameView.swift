@@ -210,7 +210,19 @@ struct PingoImmersiveGameView: View {
                     fallbackStage
                 }
 
-            case .drawAndGuess, .crazyEights, .ludo:
+            case .drawAndGuess:
+                if let state = extraState {
+                    PingoDrawGuessPhase1View(
+                        state: state,
+                        player: index,
+                        canMove: localCanMove,
+                        onMove: onExtraMove
+                    )
+                } else {
+                    fallbackStage
+                }
+
+            case .crazyEights, .ludo:
                 if let state = extraState {
                     PingoImmersivePartyView(
                         gameID: match.gameID,
