@@ -69,9 +69,10 @@ struct PingoIncomingMatchView: View {
     private var isAirHockey: Bool { payload.match.gameID == .airHockey }
     private var isMiniRacing: Bool { payload.match.gameID == .miniRacing }
     private var isWordHunt: Bool { payload.match.gameID == .wordHunt }
+    private var isAnagrams: Bool { payload.match.gameID == .anagrams }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isMiniRacing || isWordHunt
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isMiniRacing || isWordHunt || isAnagrams
     }
 
     var body: some View {
@@ -122,6 +123,10 @@ struct PingoIncomingMatchView: View {
                 } else if isWordHunt, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
                     PingoWordHuntPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
+                } else if isAnagrams, let index = localPlayerIndex {
+                    let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
+                    PingoAnagramsPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
                         .padding(.top, 66)
                 } else {
                     PingoImmersiveGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves, onPhysicsMove: onPhysicsMove, onExtraMove: onExtraMove)
