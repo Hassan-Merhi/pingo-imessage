@@ -30,7 +30,10 @@ struct PingoCrazyEightsPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoCrazyEightsFeedback.moveSubmitted(isDraw: move.primary == -1)
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -62,6 +65,23 @@ struct PingoCrazyEightsPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoCrazyEightsFeedback.prepare()
+        }
+        .onChange(of: state.lastSummary) { summary in
+            guard !summary.isEmpty else { return }
+            PingoCrazyEightsFeedback.moveResolved(summary: summary)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoCrazyEightsFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoCrazyEightsFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog("Resign this Crazy Eights match?", isPresented: $showResignConfirmation, titleVisibility: .visible) {
