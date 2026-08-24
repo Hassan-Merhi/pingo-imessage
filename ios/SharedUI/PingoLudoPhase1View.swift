@@ -7,6 +7,9 @@ struct PingoLudoPhase1View: View {
     let canMove: Bool
     let onMove: (PingoExtraGameMove) -> Void
 
+    @State private var draggingPiece: Int?
+    @State private var dragOffset: CGSize = .zero
+
     private var opponent: Int { 1 - player }
 
     private var die: Int {
@@ -48,7 +51,7 @@ struct PingoLudoPhase1View: View {
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .tracking(1.2)
                     .foregroundStyle(.black.opacity(0.38))
-                Text(canMove ? "YOUR ROLL" : "BOARD LIVE")
+                Text(canMove ? "MOVE A PIECE" : "BOARD LIVE")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(.black.opacity(0.70))
             }
@@ -63,6 +66,7 @@ struct PingoLudoPhase1View: View {
     private var boardSurface: some View {
         GeometryReader { proxy in
             let size = min(proxy.size.width, proxy.size.height)
+            let boardSize = CGSize(width: size, height: size)
 
             ZStack {
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
@@ -87,20 +91,25 @@ struct PingoLudoPhase1View: View {
 
                 ForEach(0..<24, id: \.self) { index in
                     trackCell(index: index)
-                        .position(trackPoint(index: index, in: CGSize(width: size, height: size)))
+                        .position(trackPoint(index: index, in: boardSize))
+                }
+
+                if let draggingPiece,
+                   legalPieces.contains(draggingPiece),
+                   localPieces.indices.contains(draggingPiece) {
+                    destinationGuide(for: draggingPiece, in: boardSize)
                 }
 
                 ForEach(localPieces.indices, id: \.self) { index in
                     if (0..<24).contains(localPieces[index]) {
-                        pieceMarker(owner: player, number: index + 1, isLocal: true)
-                            .position(piecePoint(position: localPieces[index], pieceIndex: index, in: CGSize(width: size, height: size)))
+                        localPieceControl(index: index, in: boardSize)
                     }
                 }
 
                 ForEach(opponentPieces.indices, id: \.self) { index in
                     if (0..<24).contains(opponentPieces[index]) {
-                        pieceMarker(owner: opponent, number: index + 1, isLocal: false)
-                            .position(piecePoint(position: opponentPieces[index], pieceIndex: index, in: CGSize(width: size, height: size)))
+                        pieceMarker(number: index + 1, isLocal: false)
+                            .position(piecePoint(position: opponentPieces[index], pieceIndex: index, in: boardSize))
                     }
                 }
 
@@ -167,8 +176,7 @@ struct PingoLudoPhase1View: View {
         return Circle()
             .fill(localHere ? Color.pingoPrimary.opacity(0.24) : (rivalHere ? Color.red.opacity(0.20) : Color.white.opacity(0.72)))
             .overlay {
-                Circle()
-                    .stroke(Color.black.opacity(0.10), lineWidth: 1)
+                Circle().stroke(Color.black.opacity(0.10), lineWidth: 1)
             }
             .frame(width: 25, height: 25)
             .overlay {
@@ -178,27 +186,86 @@ struct PingoLudoPhase1View: View {
             }
     }
 
-    private func pieceMarker(owner: Int, number: Int, isLocal: Bool) -> some View {
+    private func localPieceControl(index: Int, in size: CGSize) -> some View {
+        let legal = canMove && legalPieces.contains(index)
+        let isDragging = draggingPiece == index
+        let position = localPieces[index]
+
+        return Button {
+            submitPiece(index)
+        } label: {
+            pieceMarker(number: index + 1, isLocal: true)
+                .scaleEffect(isDragging ? 1.22 : 1)
+                .shadow(color: legal ? Color.pingoPrimary.opacity(0.34) : .clear, radius: legal ? 7 : 0)
+        }
+        .buttonStyle(.plain)
+        .disabled(!legal)
+        .opacity(canMove && !legalPieces.contains(index) ? 0.45 : 1)
+        .position(piecePoint(position: position, pieceIndex: index, in: size))
+        .offset(isDragging ? dragOffset : .zero)
+        .animation(.easeOut(duration: 0.12), value: isDragging)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 8)
+                .onChanged { value in
+                    guard legal else { return }
+                    draggingPiece = index
+                    dragOffset = value.translation
+                }
+                .onEnded { value in
+                    guard legal, draggingPiece == index else { return }
+                    let distance = hypot(value.translation.width, value.translation.height)
+                    draggingPiece = nil
+                    dragOffset = .zero
+                    if distance >= 12 {
+                        submitPiece(index)
+                    }
+                }
+        )
+        .accessibilityLabel("Piece \(index + 1), \(positionText(position))")
+        .accessibilityHint(legal ? "Tap or drag to move this piece by \(die)" : "This piece cannot move on this roll")
+    }
+
+    private func destinationGuide(for index: Int, in size: CGSize) -> some View {
+        let position = localPieces[index]
+        let destination = destinationPosition(from: position)
+        let start = piecePoint(position: max(position, 0), pieceIndex: index, in: size)
+        let end = destination >= 24
+            ? CGPoint(x: size.width * 0.31, y: size.height * 0.73)
+            : trackPoint(index: destination, in: size)
+
+        return Path { path in
+            path.move(to: start)
+            path.addLine(to: end)
+        }
+        .stroke(Color.pingoPrimary.opacity(0.62), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [7, 5]))
+        .overlay {
+            Circle()
+                .fill(Color.pingoPrimary.opacity(0.18))
+                .overlay { Circle().stroke(Color.pingoPrimary.opacity(0.62), lineWidth: 2) }
+                .frame(width: 34, height: 34)
+                .position(end)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func pieceMarker(number: Int, isLocal: Bool) -> some View {
         Circle()
             .fill(isLocal ? Color.pingoPrimary : Color(red: 0.88, green: 0.22, blue: 0.24))
-            .overlay {
-                Circle().stroke(Color.white, lineWidth: 2)
-            }
+            .overlay { Circle().stroke(Color.white, lineWidth: 2) }
             .overlay {
                 Text("\(number)")
                     .font(.system(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
             }
-            .frame(width: 22, height: 22)
+            .frame(width: 25, height: 25)
             .shadow(color: .black.opacity(0.22), radius: 3, y: 2)
-            .accessibilityLabel("\(isLocal ? "Your" : "Opponent") piece \(number)")
     }
 
     private var piecePanel: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 9) {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("YOUR PIECES")
+                    Text("DIRECT PIECE CONTROL")
                         .font(.system(size: 10, weight: .black, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(.black.opacity(0.40))
@@ -217,34 +284,34 @@ struct PingoLudoPhase1View: View {
 
             HStack(spacing: 8) {
                 ForEach(localPieces.indices, id: \.self) { index in
+                    let legal = canMove && legalPieces.contains(index)
                     Button {
-                        guard canMove, legalPieces.contains(index) else { return }
-                        onMove(.init(primary: index))
+                        submitPiece(index)
                     } label: {
-                        HStack(spacing: 7) {
-                            pieceMarker(owner: player, number: index + 1, isLocal: true)
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text("PIECE \(index + 1)")
-                                    .font(.system(size: 9, weight: .black, design: .rounded))
-                                Text(positionText(localPieces[index]))
-                                    .font(.caption2.weight(.semibold))
-                                    .opacity(0.62)
-                            }
-                            Spacer(minLength: 0)
+                        VStack(spacing: 4) {
+                            pieceMarker(number: index + 1, isLocal: true)
+                            Text(positionText(localPieces[index]))
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .lineLimit(1)
                         }
-                        .foregroundStyle(.black.opacity(0.74))
-                        .padding(.horizontal, 9)
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .foregroundStyle(.black.opacity(0.68))
+                        .frame(maxWidth: .infinity, minHeight: 54)
                         .background(
-                            legalPieces.contains(index) && canMove ? Color.pingoPrimary.opacity(0.12) : Color.white.opacity(0.54),
+                            legal ? Color.pingoPrimary.opacity(0.12) : Color.white.opacity(0.54),
                             in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                         )
                     }
                     .buttonStyle(.plain)
-                    .disabled(!canMove || !legalPieces.contains(index))
+                    .disabled(!legal)
                     .opacity(canMove && !legalPieces.contains(index) ? 0.48 : 1)
-                    .accessibilityLabel("Piece \(index + 1), \(positionText(localPieces[index]))")
-                    .accessibilityHint(legalPieces.contains(index) ? "Double tap to move this piece by \(die)" : "This piece cannot move on this roll")
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 8)
+                            .onEnded { value in
+                                guard legal else { return }
+                                let distance = hypot(value.translation.width, value.translation.height)
+                                if distance >= 12 { submitPiece(index) }
+                            }
+                    )
                 }
             }
 
@@ -284,8 +351,18 @@ struct PingoLudoPhase1View: View {
 
     private var instructionText: String {
         if legalPieces.isEmpty { return "No piece can move on this roll" }
-        if die == 6 && localPieces.contains(-1) { return "A six can bring a piece out of the yard" }
-        return "Choose one highlighted piece to move"
+        if die == 6 && localPieces.contains(-1) { return "Tap a yard piece to enter, or drag any legal piece" }
+        return "Tap a highlighted piece, or drag it toward its destination"
+    }
+
+    private func submitPiece(_ index: Int) {
+        guard canMove, legalPieces.contains(index) else { return }
+        onMove(.init(primary: index))
+    }
+
+    private func destinationPosition(from position: Int) -> Int {
+        if position < 0 { return 0 }
+        return min(24, position + die)
     }
 
     private func progressChip(label: String, pieces: [Int], highlighted: Bool) -> some View {
