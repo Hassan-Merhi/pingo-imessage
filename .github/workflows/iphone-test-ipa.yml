@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Crazy Eights Phase 2 native controls 2026-08-24
+# Rebuild marker: Crazy Eights Phase 3 gameplay animations & feedback 2026-08-24
 
 on:
   workflow_dispatch:

@@ -76,96 +76,53 @@ struct PingoImmersiveGameView: View {
 
             case .basketball:
                 let state = (try? PingoPhysicsGameEngine.basketballState(from: match.gameState)) ?? PingoBasketballState()
-                PingoBasketballPhase3View(
-                    state: state,
-                    player: index,
-                    canMove: localCanMove,
-                    onMove: onPhysicsMove
-                )
+                PingoBasketballPhase3View(state: state, player: index, canMove: localCanMove, onMove: onPhysicsMove)
 
             case .darts:
                 let state = (try? PingoPhysicsGameEngine.dartsState(from: match.gameState)) ?? PingoDartsState()
-                PingoDartsPhase3View(
-                    state: state,
-                    player: index,
-                    canMove: localCanMove,
-                    onMove: onPhysicsMove
-                )
+                PingoDartsPhase3View(state: state, player: index, canMove: localCanMove, onMove: onPhysicsMove)
 
             case .miniGolf:
                 let state = (try? PingoPhysicsGameEngine.miniGolfState(from: match.gameState)) ?? PingoMiniGolfState()
-                PingoMiniGolfPhase3View(
-                    state: state,
-                    player: index,
-                    canMove: localCanMove,
-                    onMove: onPhysicsMove
-                )
+                PingoMiniGolfPhase3View(state: state, player: index, canMove: localCanMove, onMove: onPhysicsMove)
 
             case .bowling:
-                if let state = extraState {
-                    PingoBowlingPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoBowlingPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .penaltyShootout:
-                if let state = extraState {
-                    PingoPenaltyShootoutPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoPenaltyShootoutPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .archery:
-                if let state = extraState {
-                    PingoArcheryPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoArcheryPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .airHockey:
-                if let state = extraState {
-                    PingoAirHockeyPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoAirHockeyPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .miniRacing:
-                if let state = extraState {
-                    PingoMiniRacingPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoMiniRacingPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .wordHunt:
-                if let state = extraState {
-                    PingoWordHuntPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoWordHuntPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .anagrams:
-                if let state = extraState {
-                    PingoAnagramsPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoAnagramsPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .trivia:
-                if let state = extraState {
-                    PingoTriviaPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoTriviaPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .reactionBattle:
                 if let state = extraState {
-                    PingoReactionBattlePhase3View(
-                        match: match,
-                        localProfile: localProfile,
-                        state: state,
-                        canMove: localCanMove,
-                        onMove: onExtraMove
-                    )
+                    PingoReactionBattlePhase3View(match: match, localProfile: localProfile, state: state, canMove: localCanMove, onMove: onExtraMove)
                 } else { fallbackStage }
 
             case .drawAndGuess:
-                if let state = extraState {
-                    PingoDrawGuessPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoDrawGuessPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .crazyEights:
-                if let state = extraState {
-                    PingoCrazyEightsPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoCrazyEightsPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .ludo:
-                if let state = extraState {
-                    PingoImmersivePartyView(gameID: match.gameID, state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
-                } else { fallbackStage }
+                if let state = extraState { PingoImmersivePartyView(gameID: match.gameID, state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             default:
                 fallbackStage
