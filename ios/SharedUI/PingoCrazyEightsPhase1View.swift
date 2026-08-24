@@ -7,6 +7,9 @@ struct PingoCrazyEightsPhase1View: View {
     let canMove: Bool
     let onMove: (PingoExtraGameMove) -> Void
 
+    @State private var draggedCardIndex: Int?
+    @State private var dragOffset: CGSize = .zero
+
     private var opponent: Int { 1 - player }
 
     private var localHand: [Int] {
@@ -81,8 +84,8 @@ struct PingoCrazyEightsPhase1View: View {
                 }
 
                 HStack(spacing: 7) {
-                    Image(systemName: "sparkles")
-                    Text(playableCount > 0 ? "PLAY A MATCHING CARD" : "NO MATCH • DRAW A CARD")
+                    Image(systemName: "hand.draw.fill")
+                    Text(playableCount > 0 ? "DRAG A CARD UP TO PLAY" : "NO MATCH • TAP DRAW")
                 }
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .tracking(0.9)
@@ -183,24 +186,74 @@ struct PingoCrazyEightsPhase1View: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(localHand.enumerated()), id: \.offset) { _, card in
+                    ForEach(Array(localHand.enumerated()), id: \.offset) { index, card in
                         let playable = canMove && PingoExtraGameEngine.isPlayableCard(card, on: state.topCard)
-                        Button {
-                            guard playable else { return }
-                            onMove(.init(primary: card))
-                        } label: {
-                            cardFace(card: card, emphasized: playable)
-                                .opacity(playable || !canMove ? 1 : 0.48)
-                                .scaleEffect(playable ? 1.03 : 1)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!playable)
-                        .accessibilityLabel("Play \(PingoExtraGameEngine.cardLabel(card))")
+                        handCard(card: card, index: index, playable: playable)
                     }
                 }
                 .padding(.horizontal, 2)
-                .padding(.vertical, 4)
+                .padding(.vertical, 12)
             }
+        }
+    }
+
+    private func handCard(card: Int, index: Int, playable: Bool) -> some View {
+        let isDragging = draggedCardIndex == index
+
+        return cardFace(card: card, emphasized: playable)
+            .opacity(playable || !canMove ? 1 : 0.48)
+            .scaleEffect(isDragging ? 1.12 : (playable ? 1.03 : 1))
+            .offset(isDragging ? dragOffset : .zero)
+            .zIndex(isDragging ? 20 : 0)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onTapGesture {
+                guard playable else { return }
+                play(card)
+            }
+            .gesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { value in
+                        guard playable else { return }
+                        draggedCardIndex = index
+                        dragOffset = CGSize(
+                            width: value.translation.width * 0.45,
+                            height: min(0, value.translation.height)
+                        )
+                    }
+                    .onEnded { value in
+                        guard playable else {
+                            resetDrag()
+                            return
+                        }
+
+                        let committed = value.translation.height < -42 && abs(value.translation.width) < 110
+                        if committed {
+                            play(card)
+                        }
+                        resetDrag()
+                    }
+            )
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: dragOffset)
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: draggedCardIndex)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Play \(PingoExtraGameEngine.cardLabel(card))")
+            .accessibilityHint(playable ? "Double tap or drag upward to play this card" : "This card cannot be played on the current discard")
+            .accessibilityAddTraits(playable ? .isButton : [])
+            .accessibilityAction {
+                guard playable else { return }
+                play(card)
+            }
+    }
+
+    private func play(_ card: Int) {
+        guard canMove, PingoExtraGameEngine.isPlayableCard(card, on: state.topCard) else { return }
+        onMove(.init(primary: card))
+    }
+
+    private func resetDrag() {
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.78)) {
+            draggedCardIndex = nil
+            dragOffset = .zero
         }
     }
 
@@ -249,7 +302,7 @@ struct PingoCrazyEightsPhase1View: View {
             .padding(.vertical, 8)
             .background(.white.opacity(0.52), in: Capsule())
         } else {
-            Text(canMove ? "MATCH THE TOP CARD • EIGHTS ARE WILD" : "WAITING FOR THE NEXT TURN")
+            Text(canMove ? "TAP OR DRAG A PLAYABLE CARD • EIGHTS ARE WILD" : "WAITING FOR THE NEXT TURN")
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .tracking(0.7)
                 .foregroundStyle(.black.opacity(0.36))
