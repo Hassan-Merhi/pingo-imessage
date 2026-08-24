@@ -157,7 +157,12 @@ struct PingoImmersiveGameView: View {
                     PingoDrawGuessPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
                 } else { fallbackStage }
 
-            case .crazyEights, .ludo:
+            case .crazyEights:
+                if let state = extraState {
+                    PingoCrazyEightsPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
+                } else { fallbackStage }
+
+            case .ludo:
                 if let state = extraState {
                     PingoImmersivePartyView(gameID: match.gameID, state: state, player: index, canMove: localCanMove, onMove: onExtraMove)
                 } else { fallbackStage }
