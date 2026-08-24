@@ -31,6 +31,9 @@ enum PingoMessagePreviewRenderer {
         if game.id == .trivia {
             return PingoTriviaMessagePreviewRenderer.image(payload: payload)
         }
+        if game.id == .crazyEights {
+            return PingoCrazyEightsMessagePreviewRenderer.image(payload: payload)
+        }
 
         let size = CGSize(width: 640, height: 360)
         let format = UIGraphicsImageRendererFormat()
