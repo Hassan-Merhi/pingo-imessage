@@ -122,7 +122,7 @@ struct PingoImmersiveGameView: View {
                 if let state = extraState { PingoCrazyEightsPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             case .ludo:
-                if let state = extraState { PingoLudoPhase1View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
+                if let state = extraState { PingoLudoPhase3View(state: state, player: index, canMove: localCanMove, onMove: onExtraMove) } else { fallbackStage }
 
             default:
                 fallbackStage
