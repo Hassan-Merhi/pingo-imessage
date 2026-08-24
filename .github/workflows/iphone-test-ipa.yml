@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Crazy Eights Phase 5 iMessage polish & final testing 2026-08-24
+# Rebuild marker: Ludo Phase 1 visual game surface UI 2026-08-24
 
 on:
   workflow_dispatch:
