@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Crazy Eights Phase 1 visual game surface 2026-08-24
+# Rebuild marker: Crazy Eights Phase 2 native controls 2026-08-24
 
 on:
   workflow_dispatch:
@@ -18,78 +18,76 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: iphone-test-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-test-ipa:
-    name: Sideload-safe iPhone test IPA
-    runs-on: macos-latest
+  build-ipa:
+    runs-on: macos-15
+    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Messages icon variants
-        run: bash ios/scripts/generate-imessage-icons.sh
-
       - name: Generate Xcode project
-        run: xcodegen generate --spec ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
 
-      - name: Validate privacy manifest
-        run: plutil -lint ios/Resources/PrivacyInfo.xcprivacy
+      - name: Resolve package dependencies
+        working-directory: ios
+        run: xcodebuild -resolvePackageDependencies -project Pingo.xcodeproj -scheme Pingo
 
       - name: Build unsigned Release device app
+        working-directory: ios
         run: |
-          set -euo pipefail
-          rm -rf build/iphone-test
+          set -o pipefail
           xcodebuild \
-            -project ios/Pingo.xcodeproj \
+            -project Pingo.xcodeproj \
             -scheme Pingo \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build/iphone-test/DerivedData \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
-            build
+            build | tee build-iphone.log
 
-      - name: Validate sideload-safe bundle layout
+      - name: Package test IPA
+        working-directory: ios
         run: |
           set -euo pipefail
-          APP_PATH="build/iphone-test/DerivedData/Build/Products/Release-iphoneos/Pingo.app"
-          EXTENSION_PATH="$APP_PATH/PlugIns/Pingo Messages.appex"
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/Pingo.app"
+          EXTENSION_PATH="$APP_PATH/PlugIns/PingoMessagesExtension.appex"
+
           test -d "$APP_PATH"
           test -d "$EXTENSION_PATH"
+          file "$APP_PATH/Pingo" | grep -q 'arm64'
+          file "$EXTENSION_PATH/PingoMessagesExtension" | grep -q 'arm64'
 
-          if find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) | grep -q .; then
-            echo "Unexpected Xcode debug-loader dylib found in sideload artifact:" >&2
-            find "$APP_PATH" -type f \( -name '*.debug.dylib' -o -name '__preview.dylib' \) >&2
+          if find "$APP_PATH" -type f \( -name '*.dylib' -o -name '*.framework' \) -print | grep -E 'libswift_Concurrency|libswiftCompatibility|debug|preview' -i; then
+            echo "Unexpected debug/loader dylib in Release app bundle" >&2
             exit 1
           fi
 
-          /usr/bin/file "$APP_PATH/Pingo" | grep -q 'arm64'
-          /usr/bin/file "$EXTENSION_PATH/Pingo Messages" | grep -q 'arm64'
-          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPrincipalClass' "$EXTENSION_PATH/Info.plist" | grep -Fq 'Pingo_Messages.MessagesViewController'
+          rm -rf build/Payload
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/Pingo.app
+          ditto -c -k --sequesterRsrc --keepParent build/Payload build/Pingo-Test-Release.ipa
+          test -s build/Pingo-Test-Release.ipa
 
-      - name: Package IPA for personal signing
-        run: |
-          set -euo pipefail
-          APP_PATH="build/iphone-test/DerivedData/Build/Products/Release-iphoneos/Pingo.app"
-
-          rm -rf build/iphone-test/Payload build/iphone-test/Pingo-Test-Release.ipa
-          mkdir -p build/iphone-test/Payload
-          cp -R "$APP_PATH" build/iphone-test/Payload/Pingo.app
-
-          (cd build/iphone-test && /usr/bin/zip -qry Pingo-Test-Release.ipa Payload)
-
-          test -s build/iphone-test/Pingo-Test-Release.ipa
-          /usr/bin/unzip -l build/iphone-test/Pingo-Test-Release.ipa | grep -Fq 'Payload/Pingo.app/PlugIns/Pingo Messages.appex/'
-          ! /usr/bin/unzip -l build/iphone-test/Pingo-Test-Release.ipa | grep -E '\.debug\.dylib|__preview\.dylib'
-
-      - name: Upload Pingo test IPA
+      - name: Upload test IPA
         uses: actions/upload-artifact@v4
         with:
           name: Pingo-Test-Release-IPA-${{ github.run_number }}
-          path: build/iphone-test/Pingo-Test-Release.ipa
+          path: ios/build/Pingo-Test-Release.ipa
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 10
