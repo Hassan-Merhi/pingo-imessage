@@ -33,7 +33,10 @@ struct PingoLudoPhase4View: View {
                 state: state,
                 player: player,
                 canMove: canMove && match.status == .active,
-                onMove: onMove
+                onMove: { move in
+                    PingoLudoFeedback.moveSubmitted(isPass: move.primary == -1)
+                    onMove(move)
+                }
             )
 
             VStack(spacing: 0) {
@@ -65,6 +68,23 @@ struct PingoLudoPhase4View: View {
                 )
             } else if match.status == .completed || match.status == .resigned {
                 resultState
+            }
+        }
+        .onAppear {
+            PingoLudoFeedback.prepare()
+        }
+        .onChange(of: state.lastSummary) { summary in
+            guard !summary.isEmpty else { return }
+            PingoLudoFeedback.moveResolved(summary: summary)
+        }
+        .onChange(of: canMove) { isReady in
+            if isReady && match.status == .active {
+                PingoLudoFeedback.turnReady()
+            }
+        }
+        .onChange(of: match.status) { status in
+            if status == .completed || status == .resigned {
+                PingoLudoFeedback.matchFinished(won: localWon)
             }
         }
         .confirmationDialog("Resign this Ludo match?", isPresented: $showResignConfirmation, titleVisibility: .visible) {
