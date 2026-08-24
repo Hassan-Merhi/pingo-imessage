@@ -1,5 +1,5 @@
 name: Build iPhone Test IPA
-# Rebuild marker: Ludo Phase 3 gameplay animations and feedback 2026-08-24
+# Rebuild marker: Ludo Phase 4 match flow and states 2026-08-24
 
 on:
   workflow_dispatch:
