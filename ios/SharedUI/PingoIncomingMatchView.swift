@@ -73,9 +73,10 @@ struct PingoIncomingMatchView: View {
     private var isReactionBattle: Bool { payload.match.gameID == .reactionBattle }
     private var isTrivia: Bool { payload.match.gameID == .trivia }
     private var isDrawGuess: Bool { payload.match.gameID == .drawAndGuess }
+    private var isCrazyEights: Bool { payload.match.gameID == .crazyEights }
 
     private var hasDedicatedMatchFlow: Bool {
-        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isMiniRacing || isWordHunt || isAnagrams || isReactionBattle || isTrivia || isDrawGuess
+        isEightBall || isCupPong || isBasketball || isDarts || isMiniGolf || isBowling || isPenaltyShootout || isArchery || isAirHockey || isMiniRacing || isWordHunt || isAnagrams || isReactionBattle || isTrivia || isDrawGuess || isCrazyEights
     }
 
     var body: some View {
@@ -142,6 +143,10 @@ struct PingoIncomingMatchView: View {
                 } else if isDrawGuess, let index = localPlayerIndex {
                     let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
                     PingoDrawGuessPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
+                        .padding(.top, 66)
+                } else if isCrazyEights, let index = localPlayerIndex {
+                    let state = (try? PingoExtraGameEngine.state(from: payload.match.gameState, gameID: payload.match.gameID, matchID: payload.match.id)) ?? PingoExtraGameState()
+                    PingoCrazyEightsPhase4View(state: state, player: index, canMove: localCanMove, match: payload.match, localProfile: localProfile, onMove: onExtraMove, onResign: onResign, onContinueSeries: onContinueSeries, onRematch: onRematch)
                         .padding(.top, 66)
                 } else {
                     PingoImmersiveGameView(match: payload.match, localProfile: localProfile, onMoves: onMoves, onPhysicsMove: onPhysicsMove, onExtraMove: onExtraMove)
